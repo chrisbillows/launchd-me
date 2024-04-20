@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+src/launchd_me/__init__.py
+src/launchd_me/example.py
+src/launchd_me.egg-info/PKG-INFO
+src/launchd_me.egg-info/SOURCES.txt
+src/launchd_me.egg-info/dependency_links.txt
+src/launchd_me.egg-info/entry_points.txt
+src/launchd_me.egg-info/top_level.txt

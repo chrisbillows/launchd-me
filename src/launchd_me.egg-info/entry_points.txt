@@ -1,0 +1,2 @@
+[console_scripts]
+ldm = launchd_me.example:main
