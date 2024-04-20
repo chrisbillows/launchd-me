@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+        <key>Label</key>
+        <string>local.cbillows.{{NAME-OF-SCRIPT}}</string>
+        <key>ProgramArguments</key>
+        <array>
+                <string>/Library/Frameworks/Python.framework/Versions/3.10/bin/python3</string>
+                <string>{{name_of_script.py}}</string>
+        </array>
+        <key>WorkingDirectory</key>
+        <string>{{ABSOLUTE_PATH_TO_PROJECT_DIRECTORY}}</string>
+        {{SCHEDULE_BLOCK}}
+        <key>StandardOutPath</key>
+        <string>{{ABSOLUTE_PATH_TO_PROJECT_DIRECTORY}}/logs/{{NAME-OF-SCRIPT}}.log</string>
+        <key>StandardErrorPath</key>
+        <string>{{ABSOLUTE_PATH_TO_PROJECT_DIRECTORY}}/logs/{{NAME-OF-SCRIPT}}.log</string>
+</dict>
+</plist>

@@ -1,8 +1,8 @@
 def main():
-    print("I am main, feel my pain.")
-    # with open("/Users/chrisbillows/Documents/CODE/Non_Github_Repos/package-exp_setuptools/src/package_one_name/templates/template.txt") as file_handle:
-    #     content = file_handle.readlines()
-    #     print(content)
+    print("I am main, will I work again???")
+    with open("/Users/chrisbillows/Documents/CODE/MY_GITHUB_REPOS/launchd-me/src/launchd_me/templates/plist_template.txt") as file_handle:
+        content = file_handle.readlines()
+        print(content[12])
 
 if __name__ == "__main__":
     main()
