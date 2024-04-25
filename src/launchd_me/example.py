@@ -1,8 +1,18 @@
+from launchd_me.plist_creator import PlistCreator, ScheduleType
+
 def main():
-    print("I am main, will I work again???")
-    with open("/Users/chrisbillows/Documents/CODE/MY_GITHUB_REPOS/launchd-me/src/launchd_me/templates/plist_template.txt") as file_handle:
-        content = file_handle.readlines()
-        print(content[12])
+    plc = PlistCreator("hello.py", ScheduleType.interval, 300)
+    my_list = [
+        plc.script_name, 
+        plc.schedule_type, 
+        plc.schedule, 
+        plc.template_path,
+        plc.project_dir, 
+        plc.plist_dir, 
+        plc.plist_file_name, 
+        ]
+    for x in my_list:
+        print(x)
 
 if __name__ == "__main__":
     main()
