@@ -1,7 +1,8 @@
-from launchd_me.plist_creator import PlistCreator, ScheduleType
+# from launchd_me import PlistCreator, ScheduleType
+import launchd_me
 
 def main():
-    plc = PlistCreator("hello.py", ScheduleType.interval, 300)
+    plc = launchd_me.PlistCreator("hello.py", launchd_me.ScheduleType.interval, 300)
     my_list = [
         plc.script_name, 
         plc.schedule_type, 
