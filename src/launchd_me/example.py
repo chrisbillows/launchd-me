@@ -1,4 +1,3 @@
-# from launchd_me import PlistCreator, ScheduleType
 import launchd_me
 
 def main():

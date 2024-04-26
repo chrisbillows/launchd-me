@@ -99,3 +99,6 @@ class PlistCreator:
         self.project_dir = Path(__file__).resolve().parent
         self.plist_dir = Path(self.project_dir / "plist_files")
         self.plist_file_name = f"local.cbillows.{self.script_name.split('.')[0]}.plist"
+
+if __name__ == "__main__":
+    print("hello")
