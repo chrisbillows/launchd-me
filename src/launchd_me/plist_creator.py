@@ -229,6 +229,41 @@ class PlistCreator:
             return content
 
 
+class PlistInstallationManager:
+    """Install and uninstall plist files"""
+
+    def __init__():
+        pass
+
+    def make_script_executable(script_path):
+        """
+        Makes the specified script executable by changing its permissions.
+
+        Parameters
+        ----------
+        script_path : str
+            The path to the script file to make executable.
+
+        Examples
+        --------
+        >>> make_script_executable('/path/to/my_script.py')
+        This will change the permissions of 'my_script.py' to make it executable.
+        """
+        subprocess.run(["chmod", "+x", script_path], check=True)
+        print(f"Made script executable: {script_path}")
+
+
+# plist_path = os.path.expanduser('~/Library/LaunchAgents/com.example.myscript.plist')
+
+# def create_plist(file_path):
+#     with open(plist_path, 'w') as plist_file:
+#         plist_file.write(plist_content)
+#     print(f'Plist created at {plist_path}')
+
+# def load_plist():
+#     subprocess.run(['launchctl', 'load', plist])
+
+
 
 
 CREATE_TABLE_PLIST_FILES = """
