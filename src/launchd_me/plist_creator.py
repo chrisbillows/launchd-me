@@ -103,6 +103,132 @@ class PlistCreator:
         self.plist_dir.mkdir(parents=True, exist_ok=True)
         self.plist_file_name = f"local.cbillows.{self.script_name.split('.')[0]}.plist"
 
+    def generate_plist_file(self, plist_dir=None) -> str:
+        """Driver function.
+        """
+        if self.schedule_type == "calendar":
+            self._validate_calendar_schedule(self.schedule)
+        plist_content = self._create_plist_content()
+
+        # For testing.
+        if not plist_dir:
+            plist_dir = self.plist_dir
+        plist_file_path = str(Path(plist_dir / self.plist_file_name))
+        self._write_file(plist_file_path, plist_content)
+        print(f"Plist file created at {plist_file_path}")
+        return plist_file_path
+
+    def _write_file(self, plist_path: str, plist_content: str):
+        """Write content to a file path.
+        """
+        with open(plist_path, "w") as file_handle:
+            file_handle.write(plist_content)
+
+    def _validate_calendar_schedule(self, calendar_schedule: dict) -> None:
+        """Validate a calendar schedule dictionary.
+
+        For more info see: https://www.launchd.info - "Configruation" -
+        "Starting a job at a specific time/date: StartCalendarInterval"
+        """
+        VALID_DURATIONS = {
+            "Month": range(1, 13),
+            "Day": range(1, 32),  # 1-31
+            "Hour": range(0, 24),  # 0-23
+            "Minute": range(0, 60),  # 0-59
+            "Weekday": range(0, 7),  # 0-6 (0 is Sunday)
+        }
+
+        for period, duration in calendar_schedule.items():
+            if period not in VALID_DURATIONS.keys():
+                raise Exception(f"{period} is not a valid launchctl period.")
+            if duration not in VALID_DURATIONS[period]:
+                raise Exception(f"A duration of {duration} is not valid for {period}.")
+
+    def _create_schedule_block(self):
+        """Generates the schedule block.
+
+        Generates the scheduling block for the plist file based on `schedule_type` and
+        `schedule_value`.
+
+        Returns
+        -------
+        str
+            The XML string for the scheduling part of the plist file.
+
+        Raises
+        ------
+        ValueError
+            If `schedule_type` is not one of the expected values ('interval' or 'calendar').
+
+        """
+        if self.schedule_type == "interval":
+            schedule_block = (
+                f"<key>StartInterval</key>\n\t<integer>{self.schedule}</integer>"
+            )
+            return schedule_block
+        elif self.schedule_type == "calendar":
+            schedule_block = self._create_calendar_schedule_block()
+            return schedule_block
+        else:
+            raise ValueError("Invalid schedule type. Choose 'interval' or 'calendar'.")
+
+    def _create_calendar_schedule_block(self):
+        """Generates the schedule block for the calendar schedule type.
+
+        Takes a duration dictionary  and returns a valid
+        XML block as a string (including tabs and new lines).
+
+        Returns
+        -------
+        str
+            The XML string for the scheduling part of the plist file.
+
+        Example:
+        >>> "{'Hour': 9, 'Minute': 30}"
+        <dict>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+
+        """
+        block_middle = ""
+        for period, duration in self.schedule.items():
+            block_middle += (
+                f"\n\t\t<key>{period}</key>\n\t\t<integer>{duration}</integer>"
+µ            )
+        calendar_block = (
+            "<key>StartCalendarInterval</key>\n\t<dict>" + block_middle + "\n\t</dict>"
+        )
+        return calendar_block
+
+    def _create_plist_content(self):
+            """Updates plist template with required script and schedule details.
+            
+            The new plist file is named after the script (without its extension) with a
+            '.plist' extension.
+
+            Examples
+            --------
+            >>> creator = PlistCreator('my_script.py', 'interval', 3600)
+            >>> creator.create_plist()
+            Plist file created at <project_dir>/plist_files/local.cbillows.my_script.plist
+
+            """
+            with open(self.template_path, "r") as file:
+                template = file.read()
+
+            schedule_block = self._create_schedule_block()
+            content = template.replace("{{NAME-OF-SCRIPT}}", self.script_name.split(".")[0])
+            content = content.replace("{{name_of_script.py}}", self.script_name)
+            content = content.replace(
+                "{{ABSOLUTE_PATH_TO_PROJECT_DIRECTORY}}", str(self.project_dir)
+            )
+            content = content.replace("{{SCHEDULE_BLOCK}}", schedule_block)
+            return content
+
+
 
 
 CREATE_TABLE_PLIST_FILES = """
@@ -205,4 +331,4 @@ if __name__ == "__main__":
     pds.add_newly_created_plist_file("local.cbillows.my_script.plist", "obs_temp_week_date.py", "interval", "300")
     pdg = PlistDbGetters()
     pdg.display_current_plist_files()     
-    
+
