@@ -1,7 +1,8 @@
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from importlib import resources
-
+import sqlite3
 
 class ScheduleType(str, Enum):
     interval = "interval"
@@ -96,9 +97,112 @@ class PlistCreator:
         self.schedule_type = schedule_type
         self.schedule = schedule
         self.template_path = resources.files("launchd_me.templates").joinpath('plist_template.txt')
-        self.project_dir = Path(__file__).resolve().parent
+        self.user_dir = Path.home()
+        self.project_dir = Path(self.user_dir / "launchd-me")
         self.plist_dir = Path(self.project_dir / "plist_files")
+        self.plist_dir.mkdir(parents=True, exist_ok=True)
         self.plist_file_name = f"local.cbillows.{self.script_name.split('.')[0]}.plist"
 
+
+
+CREATE_TABLE_PLIST_FILES = """
+CREATE TABLE IF NOT EXISTS PlistFiles (
+    FileID INTEGER PRIMARY KEY AUTOINCREMENT,
+    PlistFileName TEXT NOT NULL, 
+    ScriptName TEXT NOT NULL,
+    CreatedDate TEXT NOT NULL,
+    ScheduleType TEXT NOT NULL,
+    ScheduleValue TEXT,
+    CurrentState TEXT NOT NULL CHECK (CurrentState IN ('active', 'inactive', 'deleted'))
+);
+"""
+
+CREATE_TABLE_INSTALLATION_EVENTS = """
+CREATE TABLE IF NOT EXISTS InstallationEvents (
+    EventID INTEGER PRIMARY KEY AUTOINCREMENT,
+    FileID INTEGER,
+    EventType TEXT NOT NULL CHECK (EventType IN ('install', 'uninstall')),
+    EventDate TEXT NOT NULL,
+    Success INTEGER NOT NULL CHECK (Success IN (0, 1)), -- 0 = False, 1 = True
+    FOREIGN KEY (FileID) REFERENCES PlistFiles (FileID)
+);
+"""
+
+CREATE_TABLE_CURRENT_FILE_SUFFIX = """
+CREATE TABLE IF NOT EXISTS FileSuffix (
+    FileSuffix INTEGER
+)
+"""
+
+class PlistDbBaseClass():
+    """Base class for objects to handle plist database management operations."""
+        
+    def __init__(self):
+        self.plist_db = "launchd-me.db"
+        self.connection = sqlite3.connect(self.plist_db)
+        self.db_cursor = self.connection.cursor()
+    
+
+class PlistDbInitialisor(PlistDbBaseClass):
+    """Runs on application installion or reset."""
+    
+    def __init__(self):
+        super().__init__()
+        self.create_tables()
+
+    def create_tables(self):
+        self.db_cursor.execute(CREATE_TABLE_PLIST_FILES)
+        self.db_cursor.execute(CREATE_TABLE_INSTALLATION_EVENTS)
+        self.db_cursor.execute(CREATE_TABLE_CURRENT_FILE_SUFFIX)
+
+
+class PlistDbSetters(PlistDbBaseClass):
+   
+    
+   
+    def add_newly_created_plist_file(self, plist_filename, script_name, schedule_type, schedule_value):
+        now = datetime.now().isoformat()
+        insert_sql = """
+        INSERT INTO PlistFiles (
+            PlistFileName, 
+            ScriptName, 
+            CreatedDate, 
+            ScheduleType, 
+            ScheduleValue, 
+            CurrentState
+        )
+        VALUES (?, ?, ?, ?, ?, ?);
+        """
+        self.db_cursor.execute(insert_sql, (
+            plist_filename, script_name, now, schedule_type, schedule_value, 'inactive'
+            )
+        )
+        self.connection.commit()
+        
+    # So how will the user identify the plist?
+    def add_installed_installation_status():
+        pass
+    
+    def add_uninstalled_installation_status():
+        pass
+    
+    def add_deleted_installation_status():
+        pass
+      
+class PlistDbGetters(PlistDbBaseClass):
+    
+    def display_current_plist_files(self):
+        for row in self.db_cursor.execute("SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"):
+            print(row)
+
+
+class InstallEventsDbGetters(PlistDbBaseClass):
+    pass
+
 if __name__ == "__main__":
-    print("hello")
+    PlistDbInitialisor()
+    pds = PlistDbSetters()
+    pds.add_newly_created_plist_file("local.cbillows.my_script.plist", "obs_temp_week_date.py", "interval", "300")
+    pdg = PlistDbGetters()
+    pdg.display_current_plist_files()     
+    
