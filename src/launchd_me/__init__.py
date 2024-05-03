@@ -1,3 +1,3 @@
-from .plist_creator import PlistCreator, ScheduleType
+from .plist import PlistCreator, ScheduleType
 
 __all__ = ["PlistCreator", "ScheduleType"]

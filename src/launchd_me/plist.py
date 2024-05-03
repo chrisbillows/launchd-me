@@ -2,7 +2,9 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from importlib import resources
+import subprocess
 import sqlite3
+
 
 class ScheduleType(str, Enum):
     interval = "interval"
@@ -197,7 +199,7 @@ class PlistCreator:
         for period, duration in self.schedule.items():
             block_middle += (
                 f"\n\t\t<key>{period}</key>\n\t\t<integer>{duration}</integer>"
-µ            )
+            )
         calendar_block = (
             "<key>StartCalendarInterval</key>\n\t<dict>" + block_middle + "\n\t</dict>"
         )
