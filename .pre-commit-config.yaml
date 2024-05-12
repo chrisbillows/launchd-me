@@ -32,3 +32,10 @@ repos:
         language: system
         types: [python]
         stages: [commit]
+
+    -   id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: system
+        types: [python]
+        stages: [commit]
