@@ -1,6 +1,6 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v4.6.0
     hooks:
     -   id: check-added-large-files
     -   id: trailing-whitespace
@@ -8,15 +8,15 @@ repos:
     -   id: check-yaml
     -   id: check-json
     -   id: requirements-txt-fixer
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.3.2
-    hooks:
-    # Run the linter.
-    -   id: ruff
-        args: [ --fix ]
-    # Run the formatter.
-    -   id: ruff-format
+# -   repo: https://github.com/astral-sh/ruff-pre-commit
+#     # Ruff version.
+#     rev: v0.4.4
+#     hooks:
+#     # Run the linter.
+#     -   id: ruff
+#         args: [ --fix ]
+#     # Run the formatter.
+#     -   id: ruff-format
 -   repo: local
     hooks:
     -   id: pytest
@@ -27,3 +27,10 @@ repos:
         stages: [commit]
         pass_filenames: false
         always_run: true
+
+    -   id: ruff-linter
+        name: ruff lint
+        entry: ruff check
+        language: system
+        types: [python]
+        stages: [commit]

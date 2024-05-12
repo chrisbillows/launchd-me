@@ -1,6 +1,6 @@
+import logging
 import os
 import platform
-import logging
 from pathlib import Path
 
 

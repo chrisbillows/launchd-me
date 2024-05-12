@@ -1,13 +1,11 @@
+import sqlite3
+import subprocess
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from importlib import resources
-import subprocess
-import sqlite3
-
+from pathlib import Path
 
 from .logger_config import logger
-
 
 CREATE_TABLE_PLIST_FILES = """
 CREATE TABLE IF NOT EXISTS PlistFiles (
