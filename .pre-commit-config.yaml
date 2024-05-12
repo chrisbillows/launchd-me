@@ -17,15 +17,6 @@ repos:
 #     -   id: ruff-format
 -   repo: local
     hooks:
-    -   id: pytest
-        name: pytest
-        entry: pytest
-        language: system
-        types: [python]
-        stages: [commit]
-        pass_filenames: false
-        always_run: true
-
     -   id: ruff-linter-with-isort
         name: ruff lint with isort
         entry: ruff check --select I --fix
@@ -39,3 +30,12 @@ repos:
         language: system
         types: [python]
         stages: [commit]
+
+    -   id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        types: [python]
+        stages: [commit]
+        pass_filenames: false
+        always_run: true
