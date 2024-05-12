@@ -28,9 +28,9 @@ repos:
         pass_filenames: false
         always_run: true
 
-    -   id: ruff-linter
-        name: ruff lint
-        entry: ruff check
+    -   id: ruff-linter-with-isort
+        name: ruff lint with isort
+        entry: ruff check --select I --fix
         language: system
         types: [python]
         stages: [commit]
