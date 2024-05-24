@@ -1,110 +1,159 @@
 import sqlite3
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from importlib import resources
 from pathlib import Path
 
-from .logger_config import logger
-
-CREATE_TABLE_PLIST_FILES = """
-CREATE TABLE IF NOT EXISTS PlistFiles (
-    FileID INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlistFileName TEXT NOT NULL,
-    ScriptName TEXT NOT NULL,
-    CreatedDate TEXT NOT NULL,
-    ScheduleType TEXT NOT NULL,
-    ScheduleValue TEXT,
-    CurrentState TEXT NOT NULL CHECK (CurrentState IN ('active', 'inactive', 'deleted'))
-);
-"""
-
-CREATE_TABLE_INSTALLATION_EVENTS = """
-CREATE TABLE IF NOT EXISTS InstallationEvents (
-    EventID INTEGER PRIMARY KEY AUTOINCREMENT,
-    FileID INTEGER,
-    EventType TEXT NOT NULL CHECK (EventType IN ('install', 'uninstall')),
-    EventDate TEXT NOT NULL,
-    Success INTEGER NOT NULL CHECK (Success IN (0, 1)), -- 0 = False, 1 = True
-    FOREIGN KEY (FileID) REFERENCES PlistFiles (FileID)
-);
-"""
-
-CREATE_TABLE_CURRENT_FILE_SUFFIX = """
-CREATE TABLE IF NOT EXISTS FileSuffix (
-    FileSuffix INTEGER
-)
-"""
+from launchd_me.logger_config import logger
 
 
 class ScheduleType(str, Enum):
+    """Enum for specifying plist schedule type."""
+
     interval = "interval"
     calendar = "calendar"
 
 
-class UserSetUp:
-    def __init__(self, user_dir: str = None):
+class UserConfig:
+    """Configuration settings for project.
+
+    The UserConfig object can be passed to any object that requires these settings.
+
+    Parameters
+    ----------
+    user_dir: Path
+        Path to a user directory (defaults to None as this is optional for testing).
+
+    Attributes
+    ----------
+    user_dir: Path
+        The user's home directory.
+    project_dir: Path
+        The ``launchd-me`` directory in the user's home directory.
+    plist_dir: Path
+        The directory for storing plist files as
+        ``user_home_dir/launchd-me/plist_files``.
+    db_file: Path
+        Path to the SQLite ``launchd-me.db`` file.
+    plist_template_path: Path
+        Path to the plist template at ``templates.plist_template.txt``
+
+    """
+
+    def __init__(self, user_dir: Path = None):
         self.user_dir = Path(user_dir) if user_dir else Path.home()
         self.project_dir = Path(self.user_dir / "launchd-me")
         self.plist_dir = Path(self.project_dir / "plist_files")
-        self.db_file = Path(self.user_dir / "launchd-me" / "launchd-me.db")
+        self.ldm_db_file = Path(self.user_dir / "launchd-me" / "launchd-me.db")
+        self.plist_template_path = resources.files("launchd_me.templates").joinpath(
+            "plist_template.txt"
+        )
+        self.launch_agents_dir = Path(self.user_dir / "Library" / "LaunchAgents")
 
 
-class PlistDbBase:
-    """Base class for objects to handle plist database management operations."""
+class PListDbConnectionManager:
+    """Context manager for handling connections to the plist database.
 
-    def __init__(self, user_setup: UserSetUp):
-        self._user_setup = user_setup
-        self.plist_db = user_setup.db_file
-        self.connection = sqlite3.connect(self.plist_db)
-        self.db_cursor = self.connection.cursor()
+    Creates the db if it doesn't already exist.
+    """
 
+    CREATE_TABLE_PLIST_FILES = """
+    CREATE TABLE IF NOT EXISTS PlistFiles (
+        PlistFileID INTEGER PRIMARY KEY AUTOINCREMENT,
+        PlistFileName TEXT NOT NULL,
+        ScriptName TEXT NOT NULL,
+        CreatedDate TEXT NOT NULL,
+        ScheduleType TEXT NOT NULL,
+        ScheduleValue TEXT,
+        CurrentState TEXT NOT NULL CHECK (CurrentState IN ('active', 'inactive', 'deleted')),
+        Description TEXT
+    );
+    """
 
-class PlistDbInit(PlistDbBase):
-    """Runs on application installion or reset."""
+    CREATE_TABLE_INSTALLATION_EVENTS = """
+    CREATE TABLE IF NOT EXISTS InstallationEvents (
+        EventID INTEGER PRIMARY KEY AUTOINCREMENT,
+        FileID INTEGER,
+        EventType TEXT NOT NULL CHECK (EventType IN ('install', 'uninstall')),
+        EventDate TEXT NOT NULL,
+        Success INTEGER NOT NULL CHECK (Success IN (0, 1)), -- 0 = False, 1 = True
+        FOREIGN KEY (FileID) REFERENCES PlistFiles (FileID)
+    );
+    """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, user_config: UserConfig):
+        self.db_file = user_config.ldm_db_file
+        if not self.db_file.exists():
+            self._create_db()
+        self.connection = None
+        self.cursor = None
 
-    def create_db(self):
-        logger.debug("Creating database.")
-        self.db_cursor.execute(CREATE_TABLE_PLIST_FILES)
-        self.db_cursor.execute(CREATE_TABLE_INSTALLATION_EVENTS)
-        self.db_cursor.execute(CREATE_TABLE_CURRENT_FILE_SUFFIX)
-        logger.debug("Database created.")
+    def __enter__(self):
+        """Establish the connection and return the cursor."""
+        self.connection = sqlite3.connect(self.db_file)
+        self.cursor = self.connection.cursor()
+        return self.cursor
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Commit if no exception, otherwise rollback. Close the connection."""
+        if exc_type is None:
+            self.connection.commit()
+        else:
+            self.connection.rollback()
+        self.cursor.close()
+        self.connection.close()
+
+    def _create_db(self):
+        """Create the database files and tables. Only runs if not previously run."""
+        with sqlite3.connect(self.db_file) as connection:
+            logger.debug("Creating database.")
+            cursor = connection.cursor()
+            cursor.execute(self.CREATE_TABLE_PLIST_FILES)
+            cursor.execute(self.CREATE_TABLE_INSTALLATION_EVENTS)
+            connection.commit()
+            logger.debug("Database created.")
 
 
 class LaunchdMeInit:
-    def __init__(self, user_setup: UserSetUp, db_initialisor: PlistDbInit):
-        self._user_setup = user_setup
-        self._db_initialisor = db_initialisor
+    """Initialise all required directories and files for launchd-me."""
+
+    def __init__(self, user_config: UserConfig):
+        self._user_config = user_config
 
     def initialise_launchd_me(self):
-        logger.debug("Ensure application directories exist.")
-        self._ensure_directories_exist()
+        """Runs all initialisation methods."""
+        logger.debug("Initialising launchd-me")
+        logger.debug("Ensure application directory exists.")
+        self._create_app_directories()
         logger.debug("Ensure launchd-me database exists.")
         self._ensure_db_exists()
-        logger.debug("Ensure database exists.")
-        self._db_initialisor.create_db()
-
-    def _ensure_directories_exist(self):
-        if not self._ldm_usersetup.project_dir.exists():
-            logger.debug("Creating app directories.")
-            self._create_app_directories()
 
     def _create_app_directories(self):
-        self._ldm_usersetup.project_dir.mkdir(parents=True, exist_ok=True)
-        self._ldm_usersetup.plist_dir.mkdir(parents=True, exist_ok=True)
+        """Create the required app directories if they don't already exist."""
+        self._user_config.project_dir.mkdir(parents=True, exist_ok=True)
+        self._user_config.plist_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug("App directories exist.")
 
     def _ensure_db_exists(self):
-        if not self.db_file.exists():
-            db_init = PlistDbInit(self.db_file)
-            logger.debug("Creating database.")
-            db_init.create_db()
+        """Create of the ldm database file if it doesn't already exist."""
+        if not self._user_config.ldm_db_file.exists():
+            PListDbConnectionManager(self._user_config)
 
 
-class Plist:
-    pass
+@dataclass
+class PlistFileObject:
+    """I am not finished. Be kind to me."""
+
+    plist_id: int
+    plist_file_path: Path
+    script_plist_automates: Path
+    script_executable: bool
+    installed: bool
+    schedule_type: str
+    schedule: int | dict
+    plist_file_content: str  # or list of lines?
 
 
 class PlistCreator:
@@ -173,15 +222,20 @@ class PlistCreator:
 
     def __init__(
         self,
-        script_name: str,
+        path_to_script_to_automate: Path,
         schedule_type: ScheduleType,
         schedule: int | dict[str:int],
+        description: str,
+        make_executable: bool,
+        auto_install: bool,
     ):
         """
-        Parameters
+        Attributes
         ----------
-        script_name : str
-            Filename of the script to be executed by the launchd job.
+        path_to_script_to_automate : str
+            A verfied, resolved pathlib Path object to a file.
+        script_to_automate_name
+
         schedule_type : str
             Specifies the scheduling type: `"interval"` for time intervals or
             `"calendar"` for calendar dates/times.
@@ -191,34 +245,71 @@ class PlistCreator:
             if `schedule_type` is "calendar".
 
         """
-        self.template_path = resources.files("launchd_me.templates").joinpath(
-            "plist_template.txt"
-        )
-        self.script_name = script_name
+        self.path_to_script_to_automate: Path = path_to_script_to_automate
+        self.script_to_automate_name: str = self.path_to_script_to_automate.name
         self.schedule_type = schedule_type
         self.schedule = schedule
-        self.plist_file_name = f"local.cbillows.{self.script_name.split('.')[0]}.plist"
-        self.db_setter = PlistDbSetters()
+        self.description: str = description
+        self.make_executable: bool = make_executable
+        self.auto_install: bool = auto_install
+        self._user_config: UserConfig = UserConfig()
+        self.template_path = self._user_config.plist_template_path
+        self.project_dir = self._user_config.project_dir
+        self.plist_db_setter: PlistDbSetters = PlistDbSetters()
 
-    def generate_plist_file(self, plist_dir=None) -> str:
+    def driver(self, plist_dir=None) -> Path:
         """Driver function."""
         if self.schedule_type == "calendar":
             self._validate_calendar_schedule(self.schedule)
-        plist_content = self._create_plist_content()
-
-        # For testing.
-        if not plist_dir:
-            plist_dir = self.plist_dir
-        plist_file_path = str(Path(plist_dir / self.plist_file_name))
+        plist_filename = self._generate_file_name()
+        plist_content = self._create_plist_content(plist_filename)
+        plist_file_path = Path(self._user_config.plist_dir / plist_filename)
         self._write_file(plist_file_path, plist_content)
-        print(f"Plist file created at {plist_file_path}")
-        self.db_setter.add_newly_created_plist_file()
+        plist_id = self.plist_db_setter.add_newly_created_plist_file(
+            plist_filename,
+            self.path_to_script_to_automate.name,
+            self.schedule_type,
+            self.schedule,
+            self.description,
+        )
+        if self.make_executable:
+            self._make_script_executable()
+        if self.auto_install:
+            plist_installer = PlistInstaller(plist_id, plist_file_path)
+            plist_installer.install_plist(plist_id)
         return plist_file_path
 
-    def _write_file(self, plist_path: str, plist_content: str):
+    def _generate_file_name(self):
+        with PListDbConnectionManager(self._user_config) as cursor:
+            cursor.execute("SELECT COUNT(*) FROM PlistFiles")
+            row_count = cursor.fetchone()[0]
+        plist_id = row_count + 1
+        plist_file_name = f"local.cbillows.{self.path_to_script_to_automate.name.split('.')[0]}_{plist_id:04}.plist"
+        logger.debug("Generated plist file name.")
+        return plist_file_name
+
+    def _write_file(self, plist_path: Path, plist_content: str):
         """Write content to a file path."""
-        with open(plist_path, "w") as file_handle:
+        with open(str(plist_path), "w") as file_handle:
             file_handle.write(plist_content)
+        logger.info(f"Plist file created at {plist_path}")
+
+    def _make_script_executable(self):
+        """
+        Makes the specified script executable by changing its permissions.
+
+        Parameters
+        ----------
+        script_path : str
+            The path to the script file to make executable.
+
+        Examples
+        --------
+        >>> make_script_executable('/path/to/my_script.py')
+        This will change the permissions of 'my_script.py' to make it executable.
+        """
+        logger.info(f"Ensure {self.path_to_script_to_automate} is executable.")
+        subprocess.run(["chmod", "+x", self.path_to_script_to_automate], check=True)
 
     def _validate_calendar_schedule(self, calendar_schedule: dict) -> None:
         """Validate a calendar schedule dictionary.
@@ -261,6 +352,7 @@ class PlistCreator:
             schedule_block = (
                 f"<key>StartInterval</key>\n\t<integer>{self.schedule}</integer>"
             )
+            logger.debug("Generated interval block.")
             return schedule_block
         elif self.schedule_type == "calendar":
             schedule_block = self._create_calendar_schedule_block()
@@ -299,7 +391,7 @@ class PlistCreator:
         )
         return calendar_block
 
-    def _create_plist_content(self):
+    def _create_plist_content(self, plist_filename):
         """Updates plist template with required script and schedule details.
 
         The new plist file is named after the script (without its extension) with a
@@ -313,45 +405,90 @@ class PlistCreator:
 
         """
         with open(self.template_path, "r") as file:
-            template = file.read()
-
+            content = file.read()
         schedule_block = self._create_interval_schedule_block()
-        content = template.replace("{{NAME-OF-SCRIPT}}", self.script_name.split(".")[0])
-        content = content.replace("{{name_of_script.py}}", self.script_name)
+        content = content.replace("{{SCHEDULE_BLOCK}}", schedule_block)
+        content = content.replace("{{NAME_OF_PLIST_FILE}}", plist_filename)
+        content = content.replace(
+            "{{name_of_script.py}}", self.path_to_script_to_automate.name
+        )
+        content = content.replace(
+            "{{ABSOLUTE_PATH_TO_WORKING_DIRECTORY}}",
+            str(self.path_to_script_to_automate.parent),
+        )
+        # For log files.
         content = content.replace(
             "{{ABSOLUTE_PATH_TO_PROJECT_DIRECTORY}}", str(self.project_dir)
         )
-        content = content.replace("{{SCHEDULE_BLOCK}}", schedule_block)
+        logger.debug("Generated plist file content.")
         return content
 
 
-class PlistInstallationManager:
-    """Install and uninstall plist files"""
+class PlistInstaller:
+    """Install plist files"""
 
-    def __init__():
+    def __init__(self, plist_id: int, plist_file_path: Path):
+        self.plist_id = plist_id
+        self.plist_file_path = plist_file_path
+        self.user_config = UserConfig()
+        self.plist_db_setters = PlistDbSetters()
+
+    def install_plist(self, plist_id: int):
+        """Driver method."""
+        logger.debug("Creating symlink to plist in ~/Library/LaunchAgents")
+        symlink_to_plist = self._create_symlink_in_launch_agents_dir()
+        logger.debug("Validating plist file syntax.")
+        self._run_command_line_tool("plutil", "-lint", symlink_to_plist)
+        logger.debug("Loading plist file.")
+        self._run_command_line_tool("launchctl", "load", symlink_to_plist)
+        logger.debug("Updating plist installation status.")
+        self.plist_db_setters.add_installed_installation_status(plist_id)
+
+    def _create_symlink_in_launch_agents_dir(self):
+        launch_agents_dir = self.user_config.launch_agents_dir
+        if not self.plist_file_path.exists():
+            raise FileNotFoundError(f"The file {self.plist_file_path} does not exist.")
+        if not launch_agents_dir.exists():
+            raise FileNotFoundError(
+                f"The launchd directory {launch_agents_dir} was not found where expected."
+            )
+        symlink_file = launch_agents_dir / self.plist_file_path.name
+        # Because I can never remember the order: `symlink_file.symlink_to(source_file)`
+        symlink_file.symlink_to(self.plist_file_path)
+        return symlink_file
+
+    def _run_command_line_tool(self, tool, command, symlink_to_plist):
+        try:
+            logger.debug(f"Running launchctl {command}")
+            result = subprocess.run(
+                [tool, command, str(symlink_to_plist)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            logger.debug(f"Ran {tool} {command}")
+            logger.debug(f"stdout: {result.stdout}")
+            logger.debug(f"stderr: {result.stderr}")
+
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                f"Failed to run {tool} {command} for plist file: {symlink_to_plist}"
+            )
+            logger.error(f"Error message: {str(e)}")
+            logger.error(f"stdout: {e.stdout}")
+            logger.error(f"stderr: {e.stderr}")
+            raise e
+
+
+class PlistUninstaller:
+    def uninstall_plist():
         pass
 
-    def make_script_executable(script_path):
-        """
-        Makes the specified script executable by changing its permissions.
 
-        Parameters
-        ----------
-        script_path : str
-            The path to the script file to make executable.
-
-        Examples
-        --------
-        >>> make_script_executable('/path/to/my_script.py')
-        This will change the permissions of 'my_script.py' to make it executable.
-        """
-        subprocess.run(["chmod", "+x", script_path], check=True)
-        print(f"Made script executable: {script_path}")
-
-
-class PlistDbSetters(PlistDbBase):
+class PlistDbSetters:
+    @staticmethod
     def add_newly_created_plist_file(
-        self, plist_filename, script_name, schedule_type, schedule_value
+        plist_filename, script_name, schedule_type, schedule_value, description
     ):
         now = datetime.now().isoformat()
         insert_sql = """
@@ -361,26 +498,34 @@ class PlistDbSetters(PlistDbBase):
             CreatedDate,
             ScheduleType,
             ScheduleValue,
-            CurrentState
+            CurrentState,
+            Description
         )
-        VALUES (?, ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?);
         """
-        self.db_cursor.execute(
-            insert_sql,
-            (
-                plist_filename,
-                script_name,
-                now,
-                schedule_type,
-                schedule_value,
-                "inactive",
-            ),
-        )
-        self.connection.commit()
+        logger.debug("Adding new plist file to database.")
+        with PListDbConnectionManager(UserConfig()) as cursor:
+            cursor.execute(
+                insert_sql,
+                (
+                    plist_filename,
+                    script_name,
+                    now,
+                    schedule_type,
+                    schedule_value,
+                    "inactive",
+                    description,
+                ),
+            )
+        return cursor.lastrowid
 
-    # So how will the user identify the plist?
-    def add_installed_installation_status():
-        pass
+    @staticmethod
+    def add_installed_installation_status(file_id):
+        with PListDbConnectionManager(UserConfig()) as cursor:
+            cursor.execute(
+                "UPDATE PlistFiles SET CurrentState = 'active' WHERE PlistFileID = ?",
+                (file_id,),
+            )
 
     def add_uninstalled_installation_status():
         pass
@@ -389,22 +534,25 @@ class PlistDbSetters(PlistDbBase):
         pass
 
 
-class PlistDbGetters(PlistDbBase):
+class PlistDbGetters:
+    @staticmethod
     def _display_all_tracked_plist_files(self):
         """Includes deleted files."""
 
-        for row in self.db_cursor.execute(
+        for row in self.db_setup.db_cursor.execute(
             "SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"
         ):
             print(row)
 
+    @staticmethod
     def display_all_tracked_without_deleted(self):
-        for row in self.db_cursor.execute(
+        for row in self.db_setup.db_cursor.execute(
             "SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"
         ):
             # TODO: Add exception for delection statiusif
             print(row)
 
+    @staticmethod
     def display_plist_by_id(self):
         pass
 

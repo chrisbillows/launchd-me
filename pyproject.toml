@@ -23,3 +23,6 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 ldm = "launchd_me.cli:main"
+
+# [tool.ruff]
+# select = ["ALL"]
