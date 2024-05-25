@@ -1,10 +1,16 @@
 import sqlite3
 import subprocess
+from ast import alias
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from importlib import resources
 from pathlib import Path
+from turtle import color, right
+
+import rich
+from rich.console import Console
+from rich.table import Table
 
 from launchd_me.logger_config import logger
 
@@ -523,7 +529,7 @@ class PlistDbSetters:
     def add_installed_installation_status(file_id):
         with PListDbConnectionManager(UserConfig()) as cursor:
             cursor.execute(
-                "UPDATE PlistFiles SET CurrentState = 'active' WHERE PlistFileID = ?",
+                "UPDATE PlistFiles SET CurrentState = 'running' WHERE PlistFileID = ?",
                 (file_id,),
             )
 
@@ -535,24 +541,80 @@ class PlistDbSetters:
 
 
 class PlistDbGetters:
-    @staticmethod
-    def _display_all_tracked_plist_files(self):
-        """Includes deleted files."""
+    def __init__(self):
+        pass
 
-        for row in self.db_setup.db_cursor.execute(
-            "SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"
-        ):
-            print(row)
+    def display_all_tracked_plist_files(self):
+        """Display all tracked plist files, including 'deleted' files."""
+        console = Console()
+        table = self._create_table()
+        with PListDbConnectionManager(UserConfig()) as cursor:
+            cursor.execute(
+                "SELECT PlistFileID, PlistFileName, ScriptName, CreatedDate, "
+                "ScheduleType, ScheduleValue, CurrentState FROM PlistFiles"
+                " ORDER BY PlistFileID"
+            )
+            # A tuple of all database rows, where idx 0 = PlistFileID etc.
+            all_rows = cursor.fetchall()
+            for row in all_rows:
+                row = list(row)
+                row = self._format_date(row)
+                table.add_row(*[str(item) for item in row])
+        print()  # Just to give an extra line for style.
+        console.print(table)
 
-    @staticmethod
+    def _create_table(self) -> Table:
+        table = Table(box=rich.box.SIMPLE, show_header=True)
+        table.title = "  PLIST FILES"
+        table.caption = "Run `ldm list <ID> for full details on a plist file."
+        table.title_justify = "left"
+        table.title_style = "blue3 bold italic"
+        table.add_column("File\nID", justify="center", overflow="wrap")
+        table.add_column(
+            "Plist Filename", justify="center", overflow="fold", no_wrap=True
+        )
+        table.add_column(
+            "Script Called", justify="center", overflow="fold", style="magenta"
+        )
+        table.add_column("Plist\nCreated", justify="center", overflow="fold")
+        table.add_column("Schedule\nType", justify="center", overflow="fold")
+        table.add_column("Schedule\nValue", justify="center", overflow="fold")
+        table.add_column("Status", justify="center", overflow="fold")
+        return table
+
+    def _format_date(self, row: list):
+        """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date at index 3."""
+        iso_date = datetime.fromisoformat(row[3])
+        formatted_date = iso_date.strftime("%d-%m-%Y")
+        row[3] = formatted_date
+        return row
+
+    #  DON'T THINK I WANT TO USE.
+    #
+    # def _split_plist_filename_for_display(self, row: list):
+    #     """Splits a plist file name at index 1 into two parts.
+
+    #     The first part is the users default plist prefix e.g. ``local.<username>``. The
+    #     second part is the unique plist file name.
+
+    #     The ``Table()`` object expects these two values seperately and populates the
+    #     columns "Filename User Prefix", "Filename Unique".
+    #     """
+    #     plist_filename = row[1]
+    #     plist_filename_split = plist_filename.split(".")
+    #     plist_filename_prefix = ".".join(plist_filename_split[0:2])
+    #     plist_filename_unique = ".".join(plist_filename_split[2:])
+    #     row[1] = plist_filename_prefix
+    #     row.insert(2, plist_filename_unique)
+    #     return row
+
     def display_all_tracked_without_deleted(self):
         for row in self.db_setup.db_cursor.execute(
             "SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"
         ):
             # TODO: Add exception for delection statiusif
-            print(row)
+            pass
 
-    @staticmethod
     def display_plist_by_id(self):
         pass
 

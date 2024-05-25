@@ -31,7 +31,7 @@ def setup_logger(log_path: Path, app_name: str = "launchd-me"):
     logger.addHandler(file_handler)
 
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     return logger
@@ -39,4 +39,4 @@ def setup_logger(log_path: Path, app_name: str = "launchd-me"):
 
 log_path = get_log_path()
 logger = setup_logger(log_path)
-logger.info(f"Log directory and logger have been configured for {logger.name}")
+logger.debug(f"Log directory and logger have been configured for {logger.name}")

@@ -5,6 +5,7 @@ from launchd_me.logger_config import logger
 from launchd_me.plist import (
     LaunchdMeInit,
     PlistCreator,
+    PlistDbGetters,
     PlistInstaller,
     ScheduleType,
     UserConfig,
@@ -105,7 +106,9 @@ def list_plists(args):
     if args.plist_id:
         print(f"Listing details for plist id: {args.plist_id}")
     else:
-        print("Listing all plist files")
+        logger.debug("Calling 'display_all_tracked_plist_files().")
+        db_getter = PlistDbGetters()
+        db_getter.display_all_tracked_plist_files()
 
 
 def install_plist(args):
