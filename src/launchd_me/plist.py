@@ -1,16 +1,16 @@
+import getpass
 import sqlite3
 import subprocess
-from ast import alias
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from importlib import resources
 from pathlib import Path
-from turtle import color, right
 
 import rich
+from rich.columns import Columns
 from rich.console import Console
-from rich.table import Table
+from rich.table import Row, Table
 
 from launchd_me.logger_config import logger
 
@@ -34,6 +34,7 @@ class UserConfig:
 
     Attributes
     ----------
+    user_name
     user_dir: Path
         The user's home directory.
     project_dir: Path
@@ -49,6 +50,7 @@ class UserConfig:
     """
 
     def __init__(self, user_dir: Path = None):
+        self.user_name: str = getpass.getuser()
         self.user_dir = Path(user_dir) if user_dir else Path.home()
         self.project_dir = Path(self.user_dir / "launchd-me")
         self.plist_dir = Path(self.project_dir / "plist_files")
@@ -73,7 +75,7 @@ class PListDbConnectionManager:
         CreatedDate TEXT NOT NULL,
         ScheduleType TEXT NOT NULL,
         ScheduleValue TEXT,
-        CurrentState TEXT NOT NULL CHECK (CurrentState IN ('active', 'inactive', 'deleted')),
+        CurrentState TEXT NOT NULL CHECK (CurrentState IN ('running', 'inactive', 'deleted')),
         Description TEXT
     );
     """
@@ -290,7 +292,7 @@ class PlistCreator:
             cursor.execute("SELECT COUNT(*) FROM PlistFiles")
             row_count = cursor.fetchone()[0]
         plist_id = row_count + 1
-        plist_file_name = f"local.cbillows.{self.path_to_script_to_automate.name.split('.')[0]}_{plist_id:04}.plist"
+        plist_file_name = f"local.{self._user_config.user_name}.{self.path_to_script_to_automate.name.split('.')[0]}_{plist_id:04}.plist"
         logger.debug("Generated plist file name.")
         return plist_file_name
 
@@ -533,40 +535,97 @@ class PlistDbSetters:
                 (file_id,),
             )
 
-    def add_uninstalled_installation_status():
-        pass
+    def add_uninstalled_installation_status(file_id):
+        with PListDbConnectionManager(UserConfig()) as cursor:
+            cursor.execute(
+                "UPDATE PlistFiles SET CurrentState = 'inactive' WHERE PlistFileID = ?",
+                (file_id,),
+            )
 
     def add_deleted_installation_status():
         pass
 
 
 class PlistDbGetters:
-    def __init__(self):
-        pass
+    """Getters for database values. For displaying values use ``DBDisplayer()``."""
 
-    def display_all_tracked_plist_files(self):
-        """Display all tracked plist files, including 'deleted' files."""
-        console = Console()
-        table = self._create_table()
-        with PListDbConnectionManager(UserConfig()) as cursor:
+    def __init__(self, user_config: UserConfig):
+        self._user_config = user_config
+
+    def get_all_tracked_plist_files(self) -> tuple[Row, ...]:
+        """Get all details of all tracked plist files, including 'deleted' files.
+
+        Returns
+        -------
+        all_rows: tuple[Row, ...]
+            A tuple of all database rows as SQLite3 Row objects, where Row[0] =
+            "PlistFileID" etc.
+        """
+        with PListDbConnectionManager(self._user_config) as cursor:
             cursor.execute(
                 "SELECT PlistFileID, PlistFileName, ScriptName, CreatedDate, "
                 "ScheduleType, ScheduleValue, CurrentState FROM PlistFiles"
                 " ORDER BY PlistFileID"
             )
-            # A tuple of all database rows, where idx 0 = PlistFileID etc.
             all_rows = cursor.fetchall()
-            for row in all_rows:
-                row = list(row)
-                row = self._format_date(row)
-                table.add_row(*[str(item) for item in row])
+        return all_rows
+
+    def get_a_single_plist_file(self, plist_id) -> tuple[Row, list]:
+        """Get column headings and details of a given plist file.
+
+        Uses an SQLite query to get the plist file details then the `cursor.description`
+        attribute to get the column headings. These are zipped into a dictionary in the
+        format ``{"field_name", value}``.
+
+        Attributes
+        ----------
+        plist_id: int
+            The id of the plist file.
+
+        Returns
+        -------
+        plist_detail: dict
+            A dict of the plist file details in the format ``{"field_name", value}``.
+        """
+        with PListDbConnectionManager(self._user_config) as cursor:
+            cursor.execute(
+                "SELECT * FROM  PlistFiles WHERE plistFileId = ?", (plist_id,)
+            )
+            target_row = cursor.fetchall()
+            description = [description[0] for description in cursor.description]
+        plist_detail = dict(zip(description, target_row[0]))
+        return plist_detail
+
+
+class DBDisplayerBase:
+    def __init__(self) -> None:
+        self._user_config = UserConfig()
+        self._db_getter = PlistDbGetters(self._user_config)
+
+    def _format_date(self, row: list):
+        """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date at index 3."""
+        iso_date = datetime.fromisoformat(row[3])
+        formatted_date = iso_date.strftime("%d-%m-%Y")
+        row[3] = formatted_date
+        return row
+
+
+class DBAllRowsDisplayer(DBDisplayerBase):
+    def display_all_rows_table(self, all_rows) -> None:
+        console = Console()
+
+        table = self._create_table()
+        for row in all_rows:
+            row = list(row)
+            row = self._format_date(row)
+            table.add_row(*[str(item) for item in row])
         print()  # Just to give an extra line for style.
         console.print(table)
 
     def _create_table(self) -> Table:
         table = Table(box=rich.box.SIMPLE, show_header=True)
-        table.title = "  PLIST FILES"
-        table.caption = "Run `ldm list <ID> for full details on a plist file."
+        table.title = f"  USER `{self._user_config.user_name}` PERSONAL PLIST FILES"
+        table.caption = "Run `ldm list <ID> for full plist file details."
         table.title_justify = "left"
         table.title_style = "blue3 bold italic"
         table.add_column("File\nID", justify="center", overflow="wrap")
@@ -582,49 +641,32 @@ class PlistDbGetters:
         table.add_column("Status", justify="center", overflow="fold")
         return table
 
-    def _format_date(self, row: list):
-        """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date at index 3."""
-        iso_date = datetime.fromisoformat(row[3])
-        formatted_date = iso_date.strftime("%d-%m-%Y")
-        row[3] = formatted_date
-        return row
-
-    #  DON'T THINK I WANT TO USE.
-    #
-    # def _split_plist_filename_for_display(self, row: list):
-    #     """Splits a plist file name at index 1 into two parts.
-
-    #     The first part is the users default plist prefix e.g. ``local.<username>``. The
-    #     second part is the unique plist file name.
-
-    #     The ``Table()`` object expects these two values seperately and populates the
-    #     columns "Filename User Prefix", "Filename Unique".
-    #     """
-    #     plist_filename = row[1]
-    #     plist_filename_split = plist_filename.split(".")
-    #     plist_filename_prefix = ".".join(plist_filename_split[0:2])
-    #     plist_filename_unique = ".".join(plist_filename_split[2:])
-    #     row[1] = plist_filename_prefix
-    #     row.insert(2, plist_filename_unique)
-    #     return row
-
     def display_all_tracked_without_deleted(self):
-        for row in self.db_setup.db_cursor.execute(
-            "SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"
-        ):
-            # TODO: Add exception for delection statiusif
-            pass
-
-    def display_plist_by_id(self):
+        # for row in self.db_setup.db_cursor.execute(
+        #     "SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"
+        # ):
+        # TODO: Add exception for deletion statiusif
         pass
 
 
-# plist_path = os.path.expanduser('~/Library/LaunchAgents/com.example.myscript.plist')
-
-# def create_plist(file_path):
-#     with open(plist_path, 'w') as plist_file:
-#         plist_file.write(plist_content)
-#     print(f'Plist created at {plist_path}')
-
-# def load_plist():
-#     subprocess.run(['launchctl', 'load', plist])
+class DBPlistDetailDisplayer(DBDisplayerBase):
+    def display_plist_detail(self, plist_detail: dict) -> None:
+        console = Console()
+        table = Table()
+        table.add_column("Field")
+        table.add_column("Value")
+        table.title_justify = "left"
+        table.title_style = "blue3 bold italic"
+        for field_name, value in plist_detail.items():
+            # TODO: Move this to DBGetter.
+            if isinstance(value, int):
+                value = str(value)
+            # TODO: Need to generalise `_format_date` I guess?
+            # if field_name == "CreatedDate":
+            #     value = self._format_date(value)
+            if field_name == "ScriptName":
+                table.add_row(field_name, value, style="magenta")
+            else:
+                table.add_row(field_name, value)
+        print()
+        console.print(table)

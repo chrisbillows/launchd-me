@@ -3,6 +3,8 @@ from pathlib import Path
 
 from launchd_me.logger_config import logger
 from launchd_me.plist import (
+    DBAllRowsDisplayer,
+    DBPlistDetailDisplayer,
     LaunchdMeInit,
     PlistCreator,
     PlistDbGetters,
@@ -77,9 +79,9 @@ def get_args():
     parser_list.add_argument(
         "-p", "--plist-id", help="Display details of given plist file."
     )
-    parser_install.add_argument("plist-id", help="The plist id install.")
-    parser_uninstall.add_argument("plist-id", help="The plist to un-install.")
-    parser_show.add_argument("plist-id", help="The plist to display.")
+    parser_install.add_argument("plist_id", help="The plist id install.")
+    parser_uninstall.add_argument("plist_id", help="The plist to un-install.")
+    parser_show.add_argument("plist_id", help="The plist to display.")
     args = parser.parse_args()
     return args
 
@@ -103,22 +105,41 @@ def create_plist(args):
 
 
 def list_plists(args):
+    user_config = UserConfig()
+    db_getters = PlistDbGetters(user_config)
     if args.plist_id:
-        print(f"Listing details for plist id: {args.plist_id}")
+        db_plist_displayer = DBPlistDetailDisplayer()
+        row = db_getters.get_a_single_plist_file(args.plist_id)
+        db_plist_displayer.display_plist_detail(row)
     else:
         logger.debug("Calling 'display_all_tracked_plist_files().")
-        db_getter = PlistDbGetters()
-        db_getter.display_all_tracked_plist_files()
+        all_rows = db_getters.get_all_tracked_plist_files()
+        db_all_rows_displayer = DBAllRowsDisplayer()
+        db_all_rows_displayer.display_all_rows_table(all_rows)
 
 
 def install_plist(args):
     print(f"Installing plist id: {args.plist_id}")
+
+    # TODO: do we want the plist installer to need a file path we have to get from the db?
+    # Steps would be, invoke the db fetch.... then pass that below.
+    # Even if I pass this around as a plist object, it's still the same step...
+
+    # plist_installer = PlistInstaller(int(args.plist_id),"this needs a file path...")
+
+    # print(args)
+    # if len(args.plist_id) == 1:
+    #     # user_config = UserConfig()
+    #     print(f"I will be installing plist file {args.plist_id}.")
+    # else:
+    #     logger.INFO("Please enter the ID of the plist file you want to uninstall.")
 
 
 def uninstall_plist(args):
     print(f"Uninstalling plist id: {args.plist_id}")
 
 
+# TODO: Should we ditch this in favour of list a specific plist file?
 def show_plist(args):
     print(f"Showing plist id: {args.plist_id}")
 
