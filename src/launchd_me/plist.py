@@ -150,18 +150,15 @@ class LaunchdMeInit:
             PListDbConnectionManager(self._user_config)
 
 
-@dataclass
-class PlistFileObject:
-    """I am not finished. Be kind to me."""
+class LaunchdMeUninstaller:
+    def __init__(self, user_config: UserConfig):
+        self._user_config = user_config
 
-    plist_id: int
-    plist_file_path: Path
-    script_plist_automates: Path
-    script_executable: bool
-    installed: bool
-    schedule_type: str
-    schedule: int | dict
-    plist_file_content: str  # or list of lines?
+    def uninstall_launchd_me(self):
+        pass
+
+    def delete_user_info(self):
+        pass
 
 
 class PlistCreator:
@@ -283,8 +280,8 @@ class PlistCreator:
         if self.make_executable:
             self._make_script_executable()
         if self.auto_install:
-            plist_installer = PlistInstaller(plist_id, plist_file_path)
-            plist_installer.install_plist(plist_id)
+            plist_installer = PlistInstallationManager()
+            plist_installer.install_plist(plist_id, plist_file_path)
         return plist_file_path
 
     def _generate_file_name(self):
@@ -432,42 +429,52 @@ class PlistCreator:
         return content
 
 
-class PlistInstaller:
-    """Install plist files"""
+class PlistInstallationManager:
+    """Install and unisntall plist files"""
 
-    def __init__(self, plist_id: int, plist_file_path: Path):
-        self.plist_id = plist_id
-        self.plist_file_path = plist_file_path
+    # TODO: This needs a lot of error handling added.
+
+    def __init__(self):
         self.user_config = UserConfig()
         self.plist_db_setters = PlistDbSetters()
 
-    def install_plist(self, plist_id: int):
+    def install_plist(self, plist_id: int, plist_file_path: Path):
         """Driver method."""
         logger.debug("Creating symlink to plist in ~/Library/LaunchAgents")
-        symlink_to_plist = self._create_symlink_in_launch_agents_dir()
+        symlink_to_plist = self._create_symlink_in_launch_agents_dir(plist_file_path)
         logger.debug("Validating plist file syntax.")
         self._run_command_line_tool("plutil", "-lint", symlink_to_plist)
         logger.debug("Loading plist file.")
         self._run_command_line_tool("launchctl", "load", symlink_to_plist)
-        logger.debug("Updating plist installation status.")
+        logger.debug("Plist file now active.")
+        logger.debug("Updating Plist file installation status.")
         self.plist_db_setters.add_installed_installation_status(plist_id)
+        logger.debug("Database updated.")
 
-    def _create_symlink_in_launch_agents_dir(self):
+    def uninstall_plist(self, plist_id: int, symlink_to_plist: Path):
+        logger.debug("Unload plist file.")
+        self._run_command_line_tool("launchctl", "unload", symlink_to_plist)
+        logger.debug("Removing symlink")
+        symlink_to_plist.unlink()
+        logger.debug("Updating database.")
+        self.plist_db_setters.add_uninstalled_installation_status(plist_id)
+        logger.info(f"Plist file {plist_id} successfully uninstalled.")
+
+    def _create_symlink_in_launch_agents_dir(self, plist_file_path: Path):
         launch_agents_dir = self.user_config.launch_agents_dir
-        if not self.plist_file_path.exists():
-            raise FileNotFoundError(f"The file {self.plist_file_path} does not exist.")
+        if not plist_file_path.exists():
+            raise FileNotFoundError(f"The file {plist_file_path} does not exist.")
         if not launch_agents_dir.exists():
             raise FileNotFoundError(
-                f"The launchd directory {launch_agents_dir} was not found where expected."
+                f"The expected launchd directory {launch_agents_dir} was not found."
             )
-        symlink_file = launch_agents_dir / self.plist_file_path.name
+        symlink_file = launch_agents_dir / plist_file_path.name
         # Because I can never remember the order: `symlink_file.symlink_to(source_file)`
-        symlink_file.symlink_to(self.plist_file_path)
+        symlink_file.symlink_to(plist_file_path)
         return symlink_file
 
     def _run_command_line_tool(self, tool, command, symlink_to_plist):
         try:
-            logger.debug(f"Running launchctl {command}")
             result = subprocess.run(
                 [tool, command, str(symlink_to_plist)],
                 check=True,
@@ -486,11 +493,6 @@ class PlistInstaller:
             logger.error(f"stdout: {e.stdout}")
             logger.error(f"stderr: {e.stderr}")
             raise e
-
-
-class PlistUninstaller:
-    def uninstall_plist():
-        pass
 
 
 class PlistDbSetters:
@@ -535,15 +537,20 @@ class PlistDbSetters:
                 (file_id,),
             )
 
-    def add_uninstalled_installation_status(file_id):
+    def add_uninstalled_installation_status(self, file_id):
         with PListDbConnectionManager(UserConfig()) as cursor:
             cursor.execute(
                 "UPDATE PlistFiles SET CurrentState = 'inactive' WHERE PlistFileID = ?",
                 (file_id,),
             )
+        logger.debug(f"Plist {file_id} now has 'inactive' status.")
 
     def add_deleted_installation_status():
         pass
+
+
+class PlistFileIDNotFound(Exception):
+    pass
 
 
 class PlistDbGetters:
@@ -551,6 +558,30 @@ class PlistDbGetters:
 
     def __init__(self, user_config: UserConfig):
         self._user_config = user_config
+
+    def verify_plist_id_valid(self, plist_id):
+        """Checks if a plist ID is valid.
+
+        Attributes
+        ----------
+        plist_id: Any
+            A plist_id. No type checks are done to verify an int.
+
+        Raises
+        ------
+        PlistFileIDNotFound
+            If the given plist id is not in the database.
+        """
+        logger.debug(f'Checking if plist_id "{plist_id}" is in the database')
+        with PListDbConnectionManager(self._user_config) as cursor:
+            cursor.execute(
+                "SELECT * FROM  PlistFiles WHERE plistFileId = ?", (plist_id,)
+            )
+            target_row = cursor.fetchall()
+            if not target_row:
+                print("target row is none")
+                raise (PlistFileIDNotFound)
+            logger.debug(f'Plist_id "{plist_id}" is in the database')
 
     def get_all_tracked_plist_files(self) -> tuple[Row, ...]:
         """Get all details of all tracked plist files, including 'deleted' files.
@@ -570,7 +601,7 @@ class PlistDbGetters:
             all_rows = cursor.fetchall()
         return all_rows
 
-    def get_a_single_plist_file(self, plist_id) -> tuple[Row, list]:
+    def get_a_single_plist_file(self, plist_id) -> dict:
         """Get column headings and details of a given plist file.
 
         Uses an SQLite query to get the plist file details then the `cursor.description`

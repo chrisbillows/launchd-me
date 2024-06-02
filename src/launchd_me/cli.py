@@ -1,6 +1,8 @@
 import argparse
+import shutil
 from pathlib import Path
 
+from launchd_me import plist
 from launchd_me.logger_config import logger
 from launchd_me.plist import (
     DBAllRowsDisplayer,
@@ -8,10 +10,12 @@ from launchd_me.plist import (
     LaunchdMeInit,
     PlistCreator,
     PlistDbGetters,
-    PlistInstaller,
+    PlistInstallationManager,
     ScheduleType,
     UserConfig,
 )
+
+USER_CONF = UserConfig()
 
 
 def valid_path(path_str):
@@ -32,15 +36,6 @@ def get_args():
     parser_create = subparsers.add_parser(
         "create", help="Create a plist file from a given script."
     )
-    parser_list = subparsers.add_parser("list", help="List all tracked plist files.")
-    parser_install = subparsers.add_parser(
-        "install", help="Install a given plist file."
-    )
-    parser_uninstall = subparsers.add_parser(
-        "uninstall", help="Uninstall a given plist file."
-    )
-    parser_show = subparsers.add_parser("show", help="Show a given plist file.")
-
     parser_create.add_argument(
         "script_path", type=valid_path, help="path to the script to automate."
     )
@@ -76,12 +71,31 @@ def get_args():
         type=bool,
         help="Automatically load the plist file into OSX once created. Defaults to True.",
     )
+
+    parser_list = subparsers.add_parser("list", help="List all tracked plist files.")
     parser_list.add_argument(
         "-p", "--plist-id", help="Display details of given plist file."
     )
+
+    parser_install = subparsers.add_parser(
+        "install", help="Install a given plist file."
+    )
     parser_install.add_argument("plist_id", help="The plist id install.")
+
+    parser_uninstall = subparsers.add_parser(
+        "uninstall", help="Uninstall a given plist file."
+    )
     parser_uninstall.add_argument("plist_id", help="The plist to un-install.")
+
+    parser_show = subparsers.add_parser("show", help="Show a given plist file.")
     parser_show.add_argument("plist_id", help="The plist to display.")
+
+    parser_reset = subparsers.add_parser(
+        "reset",
+        help="Delete the current db and plist directory. NOTE: Currently does not "
+        "unload or delete existing plist symlinks.",
+    )
+
     args = parser.parse_args()
     return args
 
@@ -135,13 +149,46 @@ def install_plist(args):
     #     logger.INFO("Please enter the ID of the plist file you want to uninstall.")
 
 
-def uninstall_plist(args):
-    print(f"Uninstalling plist id: {args.plist_id}")
+def uninstall_plist(args: argparse.Namespace) -> None:
+    """Uninstall a plist file.
+
+    A single plist file argument is required. This is checked for existence in the
+    database.
+
+    The detail of the given plist file is extracted and the name of the plist file is
+    extracted - this is the same name as the symlink created in the installation step.
+
+    The plist file name is combined with the user's launch agents dir and then the
+    uninstall command is called.
+
+    """
+    db_getter = PlistDbGetters(USER_CONF)
+    install_manager = PlistInstallationManager()
+    db_getter.verify_plist_id_valid(args.plist_id)
+    plist_detail = db_getter.get_a_single_plist_file(args.plist_id)
+    plist_file_name = Path(plist_detail["PlistFileName"])
+    symlink_to_plist = USER_CONF.launch_agents_dir / plist_file_name
+    install_manager.uninstall_plist(args.plist_id, symlink_to_plist)
 
 
 # TODO: Should we ditch this in favour of list a specific plist file?
+# TODO: But it might be easy to do a quick printout using rich, just a nicer `cat`?
 def show_plist(args):
     print(f"Showing plist id: {args.plist_id}")
+
+
+# TODO: Do we need an "update db status" that ensures the files are where they should be
+# installed state is as expected etc?
+
+
+def reset_user(args: argparse.Namespace):
+    user_conf = UserConfig()
+    logger.debug("Fetching the project directory")
+    project_dir = user_conf.project_dir
+    logger.debug(f"Project directory: {project_dir}")
+    logger.debug(f"Deleting: {project_dir}")
+    shutil.rmtree(project_dir)
+    logger.debug("Project directory and contents deleted")
 
 
 def main():
@@ -155,6 +202,7 @@ def main():
         "install": install_plist,
         "uninstall": uninstall_plist,
         "show": show_plist,
+        "reset": reset_user,
     }
     command = args.command
     if command in command_dispatcher:
