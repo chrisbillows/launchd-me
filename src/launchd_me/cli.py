@@ -133,20 +133,13 @@ def list_plists(args):
 
 
 def install_plist(args):
-    print(f"Installing plist id: {args.plist_id}")
-
-    # TODO: do we want the plist installer to need a file path we have to get from the db?
-    # Steps would be, invoke the db fetch.... then pass that below.
-    # Even if I pass this around as a plist object, it's still the same step...
-
-    # plist_installer = PlistInstaller(int(args.plist_id),"this needs a file path...")
-
-    # print(args)
-    # if len(args.plist_id) == 1:
-    #     # user_config = UserConfig()
-    #     print(f"I will be installing plist file {args.plist_id}.")
-    # else:
-    #     logger.INFO("Please enter the ID of the plist file you want to uninstall.")
+    db_getter = PlistDbGetters(USER_CONF)
+    install_manager = PlistInstallationManager()
+    db_getter.verify_plist_id_valid(args.plist_id)
+    plist_detail = db_getter.get_a_single_plist_file(args.plist_id)
+    plist_filename = Path(plist_detail["PlistFileName"])
+    plist_file_path = Path(USER_CONF.plist_dir) / plist_filename
+    install_manager.install_plist(args.plist_id, plist_file_path)
 
 
 def uninstall_plist(args: argparse.Namespace) -> None:
