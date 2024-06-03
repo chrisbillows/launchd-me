@@ -33,7 +33,8 @@ class UserConfig:
 
     Attributes
     ----------
-    user_name
+    user_name: str
+        The current user's name.
     user_dir: Path
         The user's home directory.
     project_dir: Path
@@ -41,11 +42,13 @@ class UserConfig:
     plist_dir: Path
         The directory for storing plist files as
         ``user_home_dir/launchd-me/plist_files``.
-    db_file: Path
+    ldm_db_file: Path
         Path to the SQLite ``launchd-me.db`` file.
     plist_template_path: Path
         Path to the plist template at ``templates.plist_template.txt``
-
+    launch_agents_dir: Path
+        Path to the MacOS standard user launch agents directory; plist files saved/
+        symlinked in this dir are automatically loaded on restart.
     """
 
     def __init__(self, user_dir: Path = None):
