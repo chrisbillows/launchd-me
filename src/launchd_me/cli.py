@@ -164,16 +164,6 @@ def uninstall_plist(args: argparse.Namespace) -> None:
     install_manager.uninstall_plist(args.plist_id, symlink_to_plist)
 
 
-# TODO: Should we ditch this in favour of list a specific plist file?
-# TODO: But it might be easy to do a quick printout using rich, just a nicer `cat`?
-def show_plist(args):
-    print(f"Showing plist id: {args.plist_id}")
-
-
-# TODO: Do we need an "update db status" that ensures the files are where they should be
-# installed state is as expected etc?
-
-
 def reset_user(args: argparse.Namespace):
     user_conf = UserConfig()
     logger.debug("Fetching the project directory")
@@ -194,7 +184,6 @@ def main():
         "list": list_plists,
         "install": install_plist,
         "uninstall": uninstall_plist,
-        "show": show_plist,
         "reset": reset_user,
     }
     command = args.command
