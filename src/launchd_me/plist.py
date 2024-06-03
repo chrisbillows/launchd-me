@@ -637,6 +637,20 @@ class DBDisplayerBase:
         row[3] = formatted_date
         return row
 
+    def _style_xml_tags(self, text_to_style):
+        re_pattern = r"<([^>]+)>"
+        matches = re.finditer(re_pattern, text_to_style)
+        last_end = 0
+        styled_text = ""
+
+        for match in matches:
+            start, end = match.span()
+            styled_text += text_to_style[last_end:start]
+            styled_text += f"[grey69]{text_to_style[start:end]}[/grey69]"
+            last_end = end
+        styled_text += text_to_style[last_end:]
+        return styled_text
+
 
 class DBAllRowsDisplayer(DBDisplayerBase):
     def display_all_rows_table(self, all_rows) -> None:
@@ -674,20 +688,23 @@ class DBPlistDetailDisplayer(DBDisplayerBase):
     def display_plist_detail(self, plist_detail: dict) -> None:
         console = Console()
         table = Table()
-        table.add_column("Field")
-        table.add_column("Value")
-        table.title_justify = "left"
-        table.title_style = "blue3 bold italic"
+        table.add_column("Plist File")
+        table.add_column("Details")
         for field_name, value in plist_detail.items():
-            # TODO: Move this to DBGetter.
             if isinstance(value, int):
                 value = str(value)
-            # TODO: Need to generalise `_format_date` I guess?
-            # if field_name == "CreatedDate":
-            #     value = self._format_date(value)
             if field_name == "ScriptName":
                 table.add_row(field_name, value, style="magenta")
             else:
                 table.add_row(field_name, value)
-        print()
+        file = "/Users/chrisbillows/launchd-me/plist_files/local.chrisbillows.whole_new_name_0001.plist"
+        table.add_row("________________", "________________")
+        table.add_row("PlistFileContent", "")
+        with open(file, "r") as file_handle:
+            contents = file_handle.readlines()
+        for line in contents:
+            output = line.replace("\n", "")
+            output = self._style_xml_tags(output)
+            table.add_row("", output)
+        print()  # Just to give an extra line for style.
         console.print(table)
