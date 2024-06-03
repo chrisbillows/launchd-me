@@ -1,14 +1,13 @@
 import getpass
+import re
 import sqlite3
 import subprocess
-from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from importlib import resources
 from pathlib import Path
 
 import rich
-from rich.columns import Columns
 from rich.console import Console
 from rich.table import Row, Table
 
@@ -430,9 +429,7 @@ class PlistCreator:
 
 
 class PlistInstallationManager:
-    """Install and unisntall plist files"""
-
-    # TODO: This needs a lot of error handling added.
+    """Install and un-install plist files"""
 
     def __init__(self):
         self.user_config = UserConfig()
@@ -671,13 +668,6 @@ class DBAllRowsDisplayer(DBDisplayerBase):
         table.add_column("Schedule\nValue", justify="center", overflow="fold")
         table.add_column("Status", justify="center", overflow="fold")
         return table
-
-    def display_all_tracked_without_deleted(self):
-        # for row in self.db_setup.db_cursor.execute(
-        #     "SELECT FileID, PlistFileName, ScriptName, CreatedDate, ScheduleType, ScheduleValue, CurrentState FROM PlistFiles ORDER BY FileID"
-        # ):
-        # TODO: Add exception for deletion statiusif
-        pass
 
 
 class DBPlistDetailDisplayer(DBDisplayerBase):
