@@ -1,1 +1,1 @@
-include src/launchd_me/templates/plist_template.txt
+graft launchd_me
