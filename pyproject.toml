@@ -24,5 +24,8 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 ldm = "launchd_me.cli:main"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 # [tool.ruff]
 # select = ["ALL"]
