@@ -6,15 +6,29 @@ from sqlite3 import Connection, Cursor
 import pytest
 from launchd_me.plist import LaunchdMeInit, PListDbConnectionManager, UserConfig
 
-# class TestUserConfigInit():
 
+def test_user_config_initialises_with_correct_attributes():
+    """Initialise UserConfig object correctly.
 
-#     @mark.parametrize
+    Checks all expected attributes are present and there are no unexpected attributes.
+    """
+    expected_attributes = {
+        "user_name",
+        "user_dir",
+        "project_dir",
+        "plist_dir",
+        "ldm_db_file",
+        "plist_template_path",
+        "launch_agents_dir",
+    }
+    user_config = UserConfig()
+    actual_attributes = set(user_config.__dict__.keys())
+    assert expected_attributes == actual_attributes
 
 
 @dataclass
 class ConfiguredEnvironmentObjects:
-    """An onject for passing an initialised launchd-me configuration.
+    """An object for passing an initialised launchd-me configuration.
 
     Allows tests to access all objects used to create the test environment.
 
