@@ -93,17 +93,6 @@ def test_temp_env_paths_to_package_directories(temp_env):
     # assert temp_env.user_config.plist_template_path == 1
 
 
-# DELETE ME - Uses real Path.home()
-def test_init_of_user_config_object_using_cb_local():
-    user_config = UserConfig()
-    assert str(user_config.user_dir) == "/Users/chrisbillows"
-    assert str(user_config.project_dir) == "/Users/chrisbillows/launchd-me"
-    assert str(user_config.plist_dir) == "/Users/chrisbillows/launchd-me/plist_files"
-    assert (
-        str(user_config.ldm_db_file) == "/Users/chrisbillows/launchd-me/launchd-me.db"
-    )
-
-
 def test_launchd_me_init(temp_env):
     # Extracts the path to ldm_db_file from test_env's UserConfig object.
     ldm_db_file = temp_env.user_config.ldm_db_file
