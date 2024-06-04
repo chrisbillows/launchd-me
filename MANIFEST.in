@@ -1,1 +1,1 @@
-include src/launchd_me/templates/*.txt
+graft src/launchd_me/templates/*.txt
