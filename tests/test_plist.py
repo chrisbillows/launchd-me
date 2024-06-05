@@ -3,18 +3,49 @@ from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 
+import launchd_me
 import pytest
 from launchd_me.plist import LaunchdMeInit, PListDbConnectionManager, UserConfig
 
-# class TestUserConfigInit():
 
+class TestAllProjectObjectsInitialiseAsExpected:
+    """Basic tests that ensure all objects initialise as future tests expect.
 
-#     @mark.parametrize
+    Newly added classes should be added here.
+    """
+
+    def test_user_config_initialises_with_correct_attributes(self):
+        """Initialise UserConfig object correctly.
+
+        Checks all expected attributes are present and there are no unexpected
+        attributes.
+        """
+        expected_attributes = {
+            "user_name",
+            "user_dir",
+            "project_dir",
+            "plist_dir",
+            "ldm_db_file",
+            "plist_template_path",
+            "launch_agents_dir",
+        }
+        user_config = UserConfig()
+        actual_attributes = set(user_config.__dict__.keys())
+        assert expected_attributes == actual_attributes
+
+    def test_launchd_me_init_initialises_with_correct_attributes(self):
+        """Initialise LaunchdMeInit object correctly.
+
+        Checks all expected attributes are present and there are no unexpected attributes.
+        """
+        user_config = UserConfig()
+        ldm_init = LaunchdMeInit(user_config)
+        assert isinstance(ldm_init._user_config, UserConfig)
 
 
 @dataclass
 class ConfiguredEnvironmentObjects:
-    """An onject for passing an initialised launchd-me configuration.
+    """An object for passing an initialised launchd-me configuration.
 
     Allows tests to access all objects used to create the test environment.
 
