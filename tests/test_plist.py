@@ -151,12 +151,16 @@ class TestTheTempEnvTestEnvironment:
             "Library/LaunchAgents"
         )
 
-    def test_temp_env_paths_to_package_directories(self):
-        """Test template file exists and is accessible."""
+    def test_temp_env_paths_to_package_data_files(self):
+        """Test non Python files exist."""
+        template_file = self.temp_env.user_config.plist_template_path
+        assert template_file.exists()
+
+    def test_temp_env_data_files_are_accessible(self):
+        """Test non Python files are correctly created and therefore readable."""
         template_file = self.temp_env.user_config.plist_template_path
         with open(template_file, "r") as file_handle:
             content = file_handle.readlines()
-        assert template_file.exists()
         assert content[3] == "<dict>\n"
 
     def test_database_created_by_launchd_me_init(self):
