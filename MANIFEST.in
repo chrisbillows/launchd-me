@@ -1,2 +1,0 @@
-graft launchd_me
-include launchd_me/templates/plist_template.txt
