@@ -164,6 +164,9 @@ class TestTheTempEnvTestEnvironment:
         for item in launchd_me_install_dir.iterdir():
             print(item)
 
+        for item in template_dir.iterdir():
+            print(item)
+
         assert (
             template_file.exists()
         ), f"Template file does not exist at: {template_file}"
