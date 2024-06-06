@@ -138,7 +138,7 @@ class TestTheTempEnvTestEnvironment:
     def test_temp_env_paths_to_system_directory_directories(self):
         """Test required system directory paths are correct."""
         user_config = self.temp_env.user_config
-        temp_user_dir = temp_env.tmp_dir
+        temp_user_dir = self.temp_env.tmp_dir
         assert user_config.launch_agents_dir == temp_user_dir.joinpath(
             "Library/LaunchAgents"
         )
@@ -151,13 +151,16 @@ class TestTheTempEnvTestEnvironment:
             "Library/LaunchAgents"
         )
 
-    def test_temp_env_paths_to_package_data_files(self):
+    def test_temp_env_paths_to_package_data_files(self):  # FAILING ON GHA
         """Test non Python files exist."""
         template_file = self.temp_env.user_config.plist_template_path
-        assert template_file.exists()
+        print("The path to the template file should be", str(template_file))
+        assert (
+            template_file.exists()
+        ), f"Template file does not exist at: {template_file}"
 
     def test_temp_env_data_files_are_accessible(self):
-        """Test non Python files are correctly created and therefore readable."""
+        """Test non Python files are correctly created and therefore readable."""  # FAILING ON GHA
         template_file = self.temp_env.user_config.plist_template_path
         with open(template_file, "r") as file_handle:
             content = file_handle.readlines()
