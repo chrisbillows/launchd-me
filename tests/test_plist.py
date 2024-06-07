@@ -152,7 +152,7 @@ class TestTheTempEnvTestEnvironment:
             "Library/LaunchAgents"
         )
 
-    def test_temp_env_paths_to_package_data_files(self):  # FAILING ON GHA
+    def test_temp_env_paths_to_package_data_files(self):
         """Test non Python files exist."""
         template_file = self.temp_env.user_config.plist_template_path
         template_dir = template_file.parent
@@ -171,13 +171,12 @@ class TestTheTempEnvTestEnvironment:
             template_file.exists()
         ), f"Template file does not exist at: {template_file}"
 
-    # FAILING ON GHA
-    # def test_temp_env_data_files_are_accessible(self):
-    #     """Test non Python files are correctly created and therefore readable."""
-    #     template_file = self.temp_env.user_config.plist_template_path
-    #     with open(template_file, "r") as file_handle:
-    #         content = file_handle.readlines()
-    #     assert content[3] == "<dict>\n"
+    def test_temp_env_data_files_are_accessible(self):
+        """Test non Python files are correctly created and therefore readable."""
+        template_file = self.temp_env.user_config.plist_template_path
+        with open(template_file, "r") as file_handle:
+            content = file_handle.readlines()
+        assert content[3] == "<dict>\n"
 
     def test_database_created_by_launchd_me_init(self):
         ldm_database = self.temp_env.user_config.ldm_db_file
