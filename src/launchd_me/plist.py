@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from importlib import resources
 from pathlib import Path
+from typing import Dict, Union
 
 import rich
 from rich.console import Console
@@ -231,7 +232,7 @@ class PlistCreator:
         self,
         path_to_script_to_automate: Path,
         schedule_type: ScheduleType,
-        schedule: int | dict[str:int],
+        schedule: Union[int, Dict[str, int]],
         description: str,
         make_executable: bool,
         auto_install: bool,
