@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from importlib import resources
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, Tuple, Union
 
 import rich
 from rich.console import Console
@@ -584,7 +584,7 @@ class PlistDbGetters:
                 raise (PlistFileIDNotFound)
             logger.debug(f'Plist_id "{plist_id}" is in the database')
 
-    def get_all_tracked_plist_files(self) -> tuple[Row, ...]:
+    def get_all_tracked_plist_files(self) -> Tuple[Row, ...]:
         """Get all details of all tracked plist files, including 'deleted' files.
 
         Returns
