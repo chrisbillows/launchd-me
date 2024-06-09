@@ -1,4 +1,4 @@
-name: Test All Installation Methods
+name: Default
 
 on:
   push:
