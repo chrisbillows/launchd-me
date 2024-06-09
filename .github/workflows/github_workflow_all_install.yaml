@@ -62,5 +62,4 @@ jobs:
 
     - name: List installed package files for debugging
       run: |
-        pip show launchd-me
-        find $(python -c "import site; print(site.getsitepackages()[0])") -name "launchd_me"
+        pip show -f launchd-me
