@@ -27,8 +27,5 @@ ldm = "launchd_me.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-launchd_me = ["templates/plist_template.txt"]
-
 # [tool.ruff]
 # select = ["ALL"]
