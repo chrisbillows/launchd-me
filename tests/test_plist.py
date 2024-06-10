@@ -192,3 +192,15 @@ class TestTheTempEnvTestEnvironment:
             connection = cursor.connection
         assert isinstance(connection, Connection)
         assert isinstance(cursor, Cursor)
+
+
+class TestPlistDBConnectionManager:
+    def test_db_creation(self, tmp_path):
+        """Test connection manager creates the db if it doesn't exit."""
+        mock_user_dir = Path(tmp_path)
+        user_config = UserConfig(mock_user_dir)
+        mock_app_dir = mock_user_dir / "launchd-me"
+        mock_app_dir.mkdir(parents=True, exist_ok=True)
+        print(user_config.ldm_db_file)
+        pldbcm = PListDbConnectionManager(user_config)
+        assert Path(user_config.ldm_db_file).exists()

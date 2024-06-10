@@ -67,7 +67,8 @@ class UserConfig:
 class PListDbConnectionManager:
     """Context manager for handling connections to the plist database.
 
-    Creates the db if it doesn't already exist.
+    Creates the db if it doesn't already exist. Requires the launchd-me dir to exist
+    assuming launchd-me init has already run.
     """
 
     CREATE_TABLE_PLIST_FILES = """
