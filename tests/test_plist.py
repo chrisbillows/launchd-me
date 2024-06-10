@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 
-import launchd_me
 import pytest
 from launchd_me.plist import LaunchdMeInit, PListDbConnectionManager, UserConfig
 
@@ -193,15 +192,3 @@ class TestTheTempEnvTestEnvironment:
             connection = cursor.connection
         assert isinstance(connection, Connection)
         assert isinstance(cursor, Cursor)
-
-
-# @pytest.fixture
-# def plist_creator():
-#     plc = PlistCreator()
-#     return plc
-
-# def test_plist_creator_init():
-#     plc = PlistCreator("pretend.py", "interval", 300)
-#     assert plc.script_name == "pretend.py"
-#     assert plc.schedule == 1
-#     assert plc.template_path == "?"
