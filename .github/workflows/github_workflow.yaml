@@ -1,4 +1,4 @@
-name: Python Application Tests
+name: Default
 
 on:
   push:
@@ -7,27 +7,46 @@ on:
     branches: [ '*' ]
 
 jobs:
-  build:
+  build-and-test:
 
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        install-method: ["wheel", "sdist", "source", "editable"]
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+
+    - name: Install build tools
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install build twine
+
+    - name: Build the package
+      if: matrix.install-method == 'wheel' || matrix.install-method == 'sdist'
+      run: python -m build
+
+    - name: Install dependencies from requirements.txt
+      run: pip install -r requirements.txt
 
     - name: Install the package
-      run: pip install .
+      run: |
+        if [[ "${{ matrix.install-method }}" == "wheel" ]]; then
+          pip install dist/*.whl
+        elif [[ "${{ matrix.install-method }}" == "sdist" ]]; then
+          pip install dist/*.tar.gz
+        elif [[ "${{ matrix.install-method }}" == "source" ]]; then
+          pip install .
+        elif [[ "${{ matrix.install-method }}" == "editable" ]]; then
+          pip install -e .
+        fi
 
     - name: Run ruff
       run: ruff check --select I --fix
@@ -40,3 +59,7 @@ jobs:
 
     - name: Run ldm --help
       run: ldm --help
+
+    - name: List installed package files for debugging
+      run: |
+        pip show -f launchd-me
