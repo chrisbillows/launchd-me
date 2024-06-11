@@ -195,16 +195,25 @@ class TestTheTempEnvTestEnvironment:
 
 
 class TestPlistDBConnectionManager:
-    def test_db_file_is_created(self, tmp_path):
-        """Test connection manager creates the db if it doesn't exit."""
-        mock_user_dir = Path(tmp_path)
-        user_config = UserConfig(mock_user_dir)
-        mock_app_dir = mock_user_dir / "launchd-me"
-        mock_app_dir.mkdir(parents=True, exist_ok=True)
-        pldbcm = PListDbConnectionManager(user_config)
-        assert Path(user_config.ldm_db_file).exists()
+    @pytest.fixture(autouse=True)
+    def setup_temp_env(self, tmp_path):
+        """A valid user_config with app dirs created and user_dir set to a tmp_path.
 
-    def test_db_tables_are_created(self, tmp_path):
+        DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
+        teardown.
+        """
+        self.mock = temp_env
+        self.mock_user_dir = Path(tmp_path)
+        self.user_config = UserConfig(self.mock_user_dir)
+        self.mock_app_dir = self.mock_user_dir / "launchd-me"
+        self.mock_app_dir.mkdir(parents=True, exist_ok=True)
+
+    def test_init_creates_db_file(self):
+        """Test connection manager creates the db if it doesn't exit."""
+        pldbcm = PListDbConnectionManager(self.user_config)
+        assert Path(self.user_config.ldm_db_file).exists()
+
+    def test_init_creates_db_tables(self):
         """Test connection manager creates the db tables correctly."""
         expected_table_plist_files = [
             {"name": "PlistFileID", "type": "INTEGER"},
@@ -223,13 +232,10 @@ class TestPlistDBConnectionManager:
             {"name": "EventDate", "type": "TEXT"},
             {"name": "Success", "type": "INTEGER"},
         ]
-        mock_user_dir = Path(tmp_path)
-        user_config = UserConfig(mock_user_dir)
-        mock_app_dir = mock_user_dir / "launchd-me"
-        # Create the application directory. Usually done by LaunchdMeInit.
-        mock_app_dir.mkdir(parents=True, exist_ok=True)
-        pldbcm = PListDbConnectionManager(user_config)  # This creates the database.
-        connection = Connection(user_config.ldm_db_file)
+        pldbcm = PListDbConnectionManager(
+            self.user_config
+        )  # This creates the database.
+        connection = Connection(self.user_config.ldm_db_file)
         cursor = connection.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
@@ -247,12 +253,6 @@ class TestPlistDBConnectionManager:
         assert table_info["PlistFiles"] == expected_table_plist_files
         assert table_info["InstallationEvents"] == expected_table_installation_events
 
-    # def test_db_creation_commands(self, tmp_path):
-    #     mock_user_dir = Path(tmp_path)
-    #     user_config = UserConfig(mock_user_dir)
-    #     mock_app_dir = mock_user_dir / "launchd-me"
-    #     mock_app_dir.mkdir(parents=True, exist_ok=True)
-    #     pldbcm = PListDbConnectionManager(user_config)
-    #     pldbcm.connection.assert_called_with(
-    #         PListDbConnectionManager.CREATE_TABLE_PLIST_FILES
-    #     )
+    def test_dunder_enter(self):
+        """Tests the"""
+        pass
