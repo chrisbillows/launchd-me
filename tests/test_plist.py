@@ -195,12 +195,64 @@ class TestTheTempEnvTestEnvironment:
 
 
 class TestPlistDBConnectionManager:
-    def test_db_creation(self, tmp_path):
+    def test_db_file_is_created(self, tmp_path):
         """Test connection manager creates the db if it doesn't exit."""
         mock_user_dir = Path(tmp_path)
         user_config = UserConfig(mock_user_dir)
         mock_app_dir = mock_user_dir / "launchd-me"
         mock_app_dir.mkdir(parents=True, exist_ok=True)
-        print(user_config.ldm_db_file)
         pldbcm = PListDbConnectionManager(user_config)
         assert Path(user_config.ldm_db_file).exists()
+
+    def test_db_tables_are_created(self, tmp_path):
+        """Test connection manager creates the db tables correctly."""
+        expected_table_plist_files = [
+            {"name": "PlistFileID", "type": "INTEGER"},
+            {"name": "PlistFileName", "type": "TEXT"},
+            {"name": "ScriptName", "type": "TEXT"},
+            {"name": "CreatedDate", "type": "TEXT"},
+            {"name": "ScheduleType", "type": "TEXT"},
+            {"name": "ScheduleValue", "type": "TEXT"},
+            {"name": "CurrentState", "type": "TEXT"},
+            {"name": "Description", "type": "TEXT"},
+        ]
+        expected_table_installation_events = [
+            {"name": "EventID", "type": "INTEGER"},
+            {"name": "FileID", "type": "INTEGER"},
+            {"name": "EventType", "type": "TEXT"},
+            {"name": "EventDate", "type": "TEXT"},
+            {"name": "Success", "type": "INTEGER"},
+        ]
+        mock_user_dir = Path(tmp_path)
+        user_config = UserConfig(mock_user_dir)
+        mock_app_dir = mock_user_dir / "launchd-me"
+        # Create the application directory. Usually done by LaunchdMeInit.
+        mock_app_dir.mkdir(parents=True, exist_ok=True)
+        pldbcm = PListDbConnectionManager(user_config)  # This creates the database.
+        connection = Connection(user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        table_info = {}
+        for table in tables:
+            table_name = table[0]
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = cursor.fetchall()
+            table_info[table_name] = [
+                {"name": col[1], "type": col[2]} for col in columns
+            ]
+        cursor.close()
+        connection.close()
+        print(table_info)
+        assert table_info["PlistFiles"] == expected_table_plist_files
+        assert table_info["InstallationEvents"] == expected_table_installation_events
+
+    # def test_db_creation_commands(self, tmp_path):
+    #     mock_user_dir = Path(tmp_path)
+    #     user_config = UserConfig(mock_user_dir)
+    #     mock_app_dir = mock_user_dir / "launchd-me"
+    #     mock_app_dir.mkdir(parents=True, exist_ok=True)
+    #     pldbcm = PListDbConnectionManager(user_config)
+    #     pldbcm.connection.assert_called_with(
+    #         PListDbConnectionManager.CREATE_TABLE_PLIST_FILES
+    #     )
