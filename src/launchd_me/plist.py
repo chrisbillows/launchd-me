@@ -1,4 +1,5 @@
 import getpass
+import logging
 import re
 import sqlite3
 import subprocess
@@ -69,6 +70,13 @@ class PListDbConnectionManager:
 
     Creates the db if it doesn't already exist. Requires the launchd-me dir to exist
     assuming launchd-me init has already run.
+
+    Raises
+    ------
+    FileNotFoundError:
+        If the launchd-me directory doesn't exist and informs the developer that
+        launchd-me init must run first.
+
     """
 
     CREATE_TABLE_PLIST_FILES = """
@@ -97,6 +105,15 @@ class PListDbConnectionManager:
 
     def __init__(self, user_config: UserConfig):
         self.db_file = user_config.ldm_db_file
+        if not user_config.project_dir.exists():
+            try:
+                raise FileNotFoundError(
+                    "Launchd-me directory not created. Ensure "
+                    "LaunchdMeInit.initialise_launchd_me() is run first."
+                )
+            except FileNotFoundError as error:
+                logging.exception("Application directory is")
+                raise
         if not self.db_file.exists():
             self._create_db()
         self.connection = None
