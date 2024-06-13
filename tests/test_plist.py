@@ -224,7 +224,7 @@ class TestPlistDBConnectionManager:
         DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
         teardown.
         """
-        self.mock = temp_env
+        # self.mock = temp_env
         self.mock_user_dir = Path(tmp_path)
         self.user_config = UserConfig(self.mock_user_dir)
         self.mock_app_dir = self.mock_user_dir / "launchd-me"
