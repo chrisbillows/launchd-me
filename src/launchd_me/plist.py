@@ -112,7 +112,7 @@ class PListDbConnectionManager:
                     "LaunchdMeInit.initialise_launchd_me() is run first."
                 )
             except FileNotFoundError as error:
-                logging.exception("Application directory is")
+                logging.exception("Application directory is missing.")
                 raise
         if not self.db_file.exists():
             self._create_db()
