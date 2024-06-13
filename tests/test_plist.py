@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 
-import launchd_me
 import pytest
 from launchd_me.plist import LaunchdMeInit, PListDbConnectionManager, UserConfig
 
@@ -195,13 +194,118 @@ class TestTheTempEnvTestEnvironment:
         assert isinstance(cursor, Cursor)
 
 
-# @pytest.fixture
-# def plist_creator():
-#     plc = PlistCreator()
-#     return plc
+class TestPlistDBConnectionManager:
+    EXPECTED_COLUMNS_PLIST_FILES = [
+        {"name": "PlistFileID", "type": "INTEGER"},
+        {"name": "PlistFileName", "type": "TEXT"},
+        {"name": "ScriptName", "type": "TEXT"},
+        {"name": "CreatedDate", "type": "TEXT"},
+        {"name": "ScheduleType", "type": "TEXT"},
+        {"name": "ScheduleValue", "type": "TEXT"},
+        {"name": "CurrentState", "type": "TEXT"},
+        {"name": "Description", "type": "TEXT"},
+    ]
 
-# def test_plist_creator_init():
-#     plc = PlistCreator("pretend.py", "interval", 300)
-#     assert plc.script_name == "pretend.py"
-#     assert plc.schedule == 1
-#     assert plc.template_path == "?"
+    EXPECTED_COLUMNS_INSTALLATION_EVENTS = [
+        {"name": "EventID", "type": "INTEGER"},
+        {"name": "FileID", "type": "INTEGER"},
+        {"name": "EventType", "type": "TEXT"},
+        {"name": "EventDate", "type": "TEXT"},
+        {"name": "Success", "type": "INTEGER"},
+    ]
+
+    @pytest.fixture(autouse=True)
+    def setup_temp_env(self, tmp_path):
+        """Create a valid `user_config` with database. Auto use in all class methods.
+
+        Manually creates the required application directories (normally handled by
+        LaunchdMeInit).  Sets the `user-dir` to a Pytest `tmp_path` object.
+
+        DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
+        teardown.
+        """
+        self.mock = temp_env
+        self.mock_user_dir = Path(tmp_path)
+        self.user_config = UserConfig(self.mock_user_dir)
+        self.mock_app_dir = self.mock_user_dir / "launchd-me"
+        self.mock_app_dir.mkdir(parents=True, exist_ok=True)
+
+    def test_init_creates_db_file(self):
+        """Test connection manager init creates the db if it doesn't exit."""
+        self.pdlcm = PListDbConnectionManager(self.user_config)
+        assert Path(self.user_config.ldm_db_file).exists()
+
+    def get_database_tables(self) -> dict:
+        """Non-test function returning all tables in the current ldm_db_file database.
+
+        Creates an independent connection. i.e. doesn't use pldbcm. Extracts all the
+        table data and creates a dictionary of the results.
+
+        Returns
+        -------
+        table_info: dict
+            A dictionary in the format {
+                <table_name> :
+                    "name": <column_name>,
+                    "type": <column_type>
+                    }
+        """
+        connection = Connection(self.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        table_info = {}
+        for table in tables:
+            table_name = table[0]
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = cursor.fetchall()
+            table_info[table_name] = [
+                {"name": col[1], "type": col[2]} for col in columns
+            ]
+        cursor.close()
+        connection.close()
+        return table_info
+
+    def test_init_creates_db_tables_correctly(self):
+        """Test connection manager creates the db tables correctly on init."""
+        self.pdlcm = PListDbConnectionManager(self.user_config)
+        table_info = self.get_database_tables()
+        assert table_info["PlistFiles"] == self.EXPECTED_COLUMNS_PLIST_FILES
+        assert (
+            table_info["InstallationEvents"]
+            == self.EXPECTED_COLUMNS_INSTALLATION_EVENTS
+        )
+
+    def test_create_db__function_creates_tables_correctly(self):
+        """Test the `_create_db` function creates the db and tables correctly.
+
+        The `PListDbConnectionManager` _init_ is coupled to running `_create_db`. In
+        that configuration this test is moot. However, if that init were to be changed
+        this would test the `_create_db` function directly.
+        """
+        self.pdlcm = PListDbConnectionManager(self.user_config)
+        self.pdlcm._create_db()
+        table_info = self.get_database_tables()
+        assert table_info["PlistFiles"] == self.EXPECTED_COLUMNS_PLIST_FILES
+        assert (
+            table_info["InstallationEvents"]
+            == self.EXPECTED_COLUMNS_INSTALLATION_EVENTS
+        )
+
+    def test_dunder_enter(self):
+        """Test the enter method returns a Cursor object with a valid DB connection.
+
+        Use the basic SQL command "SELECT 1" which is commonly used for testing; it
+        instructs SQL to return 1.
+        """
+        expected = (1,)
+        pldbcm = PListDbConnectionManager(self.user_config)
+        cursor = pldbcm.__enter__()
+        assert isinstance(cursor, Cursor)
+        try:
+            cursor.execute("SELECT 1")
+            cursor = cursor.fetchone()
+            assert cursor == expected
+        finally:
+            pldbcm.cursor.close()
+            pldbcm.connection.close()
