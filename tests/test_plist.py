@@ -32,15 +32,6 @@ class TestAllProjectObjectsInitialiseAsExpected:
         actual_attributes = set(user_config.__dict__.keys())
         assert expected_attributes == actual_attributes
 
-    def test_launchd_me_init_initialises_with_correct_attributes(self):
-        """Initialise LaunchdMeInit object correctly.
-
-        Checks all expected attributes are present and there are no unexpected attributes.
-        """
-        user_config = UserConfig()
-        ldm_init = LaunchdMeInit(user_config)
-        assert isinstance(ldm_init._user_config, UserConfig)
-
 
 @dataclass
 class ConfiguredEnvironmentObjects:
@@ -309,3 +300,31 @@ class TestPlistDBConnectionManager:
         finally:
             pldbcm.cursor.close()
             pldbcm.connection.close()
+
+
+class TestLaunchdMeInit:
+    def test_launchd_me_init_initialises_with_correct_attributes(self):
+        """Initialise LaunchdMeInit object correctly.
+
+        Checks all expected attributes are present and there are no unexpected attributes.
+        """
+        user_config = UserConfig()
+        ldm_init = LaunchdMeInit(user_config)
+        assert isinstance(ldm_init._user_config, UserConfig)
+
+    def test_create_app_directories(self, tmp_path):
+        mock_user_dir = Path(tmp_path)
+        user_config = UserConfig(mock_user_dir)
+        ldm = LaunchdMeInit(user_config)
+        ldm._create_app_directories()
+        assert user_config.plist_dir.exists()
+        assert user_config.project_dir.exists()
+
+    def test_ensure_db_exists(self, tmp_path):
+        # TODO: I have created an error with the changes I made to PListDbConnection Manager.
+        # It's now circular. It checks if the db exists and won't work - but it needs to be
+        mock_user_dir = Path(tmp_path)
+        user_config = UserConfig(mock_user_dir)
+        ldm = LaunchdMeInit(user_config)
+        ldm._ensure_db_exists()
+        assert user_config.launch_agents_dir.exists()
