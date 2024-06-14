@@ -1,10 +1,17 @@
 import getpass
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from launchd_me.plist import LaunchdMeInit, PListDbConnectionManager, UserConfig
+from launchd_me.plist import (
+    LaunchdMeInit,
+    PListDbConnectionManager,
+    PlistInstallationManager,
+    UserConfig,
+)
 
 
 class TestAllProjectObjectsInitialiseAsExpected:
@@ -309,3 +316,80 @@ class TestPlistDBConnectionManager:
         finally:
             pldbcm.cursor.close()
             pldbcm.connection.close()
+
+
+class TestPlistInstallationManager:
+    def test_plist_installation_manager_init(self, tmp_path):
+        mock_user_dir = Path(tmp_path)
+        user_config = UserConfig(mock_user_dir)
+        db_setter = Mock()
+        plim = PlistInstallationManager(user_config, db_setter)
+        assert plim.user_config is not None
+        assert plim.plist_db_setters is not None
+
+    def test_install_plist(self):
+        """Uses multiple methods so tested in integration tests."""
+        pass
+
+    def test_uninstall_plist(self):
+        """Uses multiple methods so tested in integration tests."""
+        pass
+
+    def test_create_symlink_in_launch_agents_dir(self, tmp_path):
+        """Tests creation of symlink in launch agents dir.
+
+        `LaunchAgents` exists by default in `usr/Library/LaunchAgents`. This test
+        creates that directory where `user_dir` is mocked as a `tmp_path`. The test
+        creates a empty `my_mock_script.py` in the mock user dir and then asserts
+        a symlink
+        """
+        mock_user_dir = Path(tmp_path)
+        mock_plist_filename = "my_mock_plist.plist"
+        mock_plist = mock_user_dir / mock_plist_filename
+        mock_plist.touch()
+        user_config = UserConfig(mock_user_dir)
+        mock_launch_agents_dir = mock_user_dir / "Library" / "LaunchAgents"
+        mock_launch_agents_dir.mkdir(parents=True, exist_ok=True)
+        db_setter = Mock()
+        plim = PlistInstallationManager(user_config, db_setter)
+        plim._create_symlink_in_launch_agents_dir(mock_plist)
+        actual_symlink = mock_launch_agents_dir / mock_plist_filename
+        print(actual_symlink)
+        assert actual_symlink.exists()
+        assert actual_symlink.is_symlink()
+
+    @patch("subprocess.run")
+    def test_run_command_line_tool_success(self, mock_run, tmp_path):
+        mock_user_dir = Path(tmp_path)
+        user_config = UserConfig(mock_user_dir)
+        db_setter = Mock()
+        plim = PlistInstallationManager(user_config, db_setter)
+
+        mock_result = MagicMock()
+        mock_result.stdout = "success message"
+        mock_result.stderr = ""
+        mock_run.return_value = mock_result
+
+        tool = "some_tool"
+        command = "some_command"
+        symlink_to_plist = "/some_path"
+        plim._run_command_line_tool(tool, command, symlink_to_plist)
+        mock_run.assert_called_once_with(
+            [tool, command, str(symlink_to_plist)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_run_command_line_tool_returns_error(self, tmp_path):
+        mock_user_dir = Path(tmp_path)
+        user_config = UserConfig(mock_user_dir)
+        mock_plist_filename = "my_mock_plist.plist"
+        mock_plist = mock_user_dir / mock_plist_filename
+        mock_plist.touch()
+
+        db_setter = Mock()
+        plim = PlistInstallationManager(user_config, db_setter)
+
+        with pytest.raises(subprocess.CalledProcessError):
+            plim._run_command_line_tool("plutil", "-lint", mock_plist)
