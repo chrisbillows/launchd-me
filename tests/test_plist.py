@@ -1,3 +1,17 @@
+"""Unit tests for plist classes.
+
+A number of test classes use a `pytest.fixture` to supply test objects to every test
+in the class. E.g.
+
+```
+@pytest.fixture(autouse=True)
+def setup_temp_env(self, tmp_path):
+```
+
+This serves the same pass as an `__init__` method. An autouse fixture is used as it
+allows Pytest to carry out automatic setup and teardown.
+"""
+
 import getpass
 import subprocess
 from dataclasses import dataclass
@@ -227,9 +241,6 @@ class TestPlistDBConnectionManager:
 
         Manually creates the required application directories (normally handled by
         LaunchdMeInit).  Sets the `user-dir` to a Pytest `tmp_path` object.
-
-        DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
-        teardown.
         """
         self.mock = temp_env
         self.mock_user_dir = Path(tmp_path)
@@ -319,13 +330,29 @@ class TestPlistDBConnectionManager:
 
 
 class TestPlistInstallationManager:
-    def test_plist_installation_manager_init(self, tmp_path):
-        mock_user_dir = Path(tmp_path)
-        user_config = UserConfig(mock_user_dir)
-        db_setter = Mock()
-        plim = PlistInstallationManager(user_config, db_setter)
-        assert plim.user_config is not None
-        assert plim.plist_db_setters is not None
+    @pytest.fixture(autouse=True)
+    def setup_temp_env(self, tmp_path):
+        """Auto use objects throughout class.
+
+        Creates a `UserConfig` with a `tmp_path` as the user directory. Creates an empty
+        Mock PlistDBSetter, necessary for creating a PlistInsallationManager.
+
+        Also creates an empty file in the `mock_user_dir` - `mock_plist` as a stand-in
+        plist file.
+        """
+        self.mock_user_dir = Path(tmp_path)
+        self.user_config = UserConfig(self.mock_user_dir)
+        self.db_setter = Mock()
+        self.plim = PlistInstallationManager(self.user_config, self.db_setter)
+
+        self.mock_plist_filename = "my_mock_plist.plist"
+        self.mock_plist = self.mock_user_dir / self.mock_plist_filename
+        self.mock_plist.touch()
+
+    def test_plist_installation_manager_init(self):
+        """Assert PlistInstallationManager object has the expected attributes."""
+        assert self.plim.user_config is not None
+        assert self.plim.plist_db_setters is not None
 
     def test_install_plist(self):
         """Uses multiple methods so tested in integration tests."""
@@ -335,36 +362,31 @@ class TestPlistInstallationManager:
         """Uses multiple methods so tested in integration tests."""
         pass
 
-    def test_create_symlink_in_launch_agents_dir(self, tmp_path):
-        """Tests creation of symlink in launch agents dir.
+    def test_create_symlink_in_launch_agents_dir(self):
+        """Test the creation of symlink in the launch agents directory.
 
         `LaunchAgents` exists by default in `usr/Library/LaunchAgents`. This test
-        creates that directory where `user_dir` is mocked as a `tmp_path`. The test
-        creates a empty `my_mock_script.py` in the mock user dir and then asserts
-        a symlink
+        creates that directory in `mock_user_dir`.
+
+        The test passes `mock_plist` for symlink creation. The test
+        asserts that `expected_symlink_path` has been created and is a symlink.
         """
-        mock_user_dir = Path(tmp_path)
-        mock_plist_filename = "my_mock_plist.plist"
-        mock_plist = mock_user_dir / mock_plist_filename
-        mock_plist.touch()
-        user_config = UserConfig(mock_user_dir)
-        mock_launch_agents_dir = mock_user_dir / "Library" / "LaunchAgents"
+        mock_launch_agents_dir = self.mock_user_dir / "Library" / "LaunchAgents"
         mock_launch_agents_dir.mkdir(parents=True, exist_ok=True)
-        db_setter = Mock()
-        plim = PlistInstallationManager(user_config, db_setter)
-        plim._create_symlink_in_launch_agents_dir(mock_plist)
-        actual_symlink = mock_launch_agents_dir / mock_plist_filename
-        print(actual_symlink)
-        assert actual_symlink.exists()
-        assert actual_symlink.is_symlink()
+        self.plim._create_symlink_in_launch_agents_dir(self.mock_plist)
+
+        expected_symlink_path = mock_launch_agents_dir / self.mock_plist_filename
+
+        assert expected_symlink_path.exists()
+        assert expected_symlink_path.is_symlink()
 
     @patch("subprocess.run")
-    def test_run_command_line_tool_success(self, mock_run, tmp_path):
-        mock_user_dir = Path(tmp_path)
-        user_config = UserConfig(mock_user_dir)
-        db_setter = Mock()
-        plim = PlistInstallationManager(user_config, db_setter)
+    def test_run_command_line_tool_success(self, mock_run):
+        """Assert `run command line tool` calls subprocess with expected commands.
 
+        Patches `subprocess.run` with `mock_run` and gives it a valid return value
+        with the MagicMock `mock_result`.
+        """
         mock_result = MagicMock()
         mock_result.stdout = "success message"
         mock_result.stderr = ""
@@ -373,7 +395,7 @@ class TestPlistInstallationManager:
         tool = "some_tool"
         command = "some_command"
         symlink_to_plist = "/some_path"
-        plim._run_command_line_tool(tool, command, symlink_to_plist)
+        self.plim._run_command_line_tool(tool, command, symlink_to_plist)
         mock_run.assert_called_once_with(
             [tool, command, str(symlink_to_plist)],
             check=True,
@@ -381,15 +403,7 @@ class TestPlistInstallationManager:
             text=True,
         )
 
-    def test_run_command_line_tool_returns_error(self, tmp_path):
-        mock_user_dir = Path(tmp_path)
-        user_config = UserConfig(mock_user_dir)
-        mock_plist_filename = "my_mock_plist.plist"
-        mock_plist = mock_user_dir / mock_plist_filename
-        mock_plist.touch()
-
-        db_setter = Mock()
-        plim = PlistInstallationManager(user_config, db_setter)
-
+    def test_run_command_line_tool_returns_error(self):
+        """Assert an empty file fails a genuine `pluitil -lint` call."""
         with pytest.raises(subprocess.CalledProcessError):
-            plim._run_command_line_tool("plutil", "-lint", mock_plist)
+            self.plim._run_command_line_tool("plutil", "-lint", self.mock_plist)
