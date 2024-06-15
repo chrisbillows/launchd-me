@@ -404,6 +404,6 @@ class TestPlistInstallationManager:
         )
 
     def test_run_command_line_tool_returns_error(self):
-        """Assert an empty file fails a genuine `pluitil -lint` call."""
+        """Assert an generic non-zero CLI call raises an error."""
         with pytest.raises(subprocess.CalledProcessError):
-            self.plim._run_command_line_tool("plutil", "-lint", self.mock_plist)
+            self.plim._run_command_line_tool("grep", "hello", self.mock_plist)
