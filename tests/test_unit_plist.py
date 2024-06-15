@@ -15,6 +15,7 @@ allows Pytest to carry out automatic setup and teardown.
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from unittest.mock import MagicMock, Mock, patch
@@ -474,5 +475,23 @@ class TestPlistCreator:
         actual = plc_calendar._create_calendar_schedule_block()
         assert actual == expected
 
-    def test_create_plist_content(self):
-        pass
+    def test_create_plist_content(self, plc_interval):
+        mock_schedule_block = "<key>StartInterval</key>\n\t<integer>1000</integer>"
+        content = plc_interval._create_plist_content(
+            "file_to_schedule", mock_schedule_block
+        )
+        content_lines = content.split("\n")
+        line_idx_5 = "        <string>file_to_schedule</string>"
+        line_idx_9 = "                <string>interval_task.py</string>"
+        line_idx_18_ends = "launchd-me/logs/file_to_schedule_err.log</string>"
+        assert content_lines[5] == line_idx_5
+        assert content_lines[9] == line_idx_9
+        assert content_lines[18].endswith(line_idx_18_ends)
+        if sys.platform == "darwin":
+            plist_file = plc_interval._user_config.plist_dir / "test.plist"
+            plist_file.parent.mkdir(parents=True)
+            plist_file.write_text(content)
+            assert subprocess.run(["plutil", "-lint", str(plist_file)])
+
+        # ldm_init = LaunchdMeInit(mock_user_config)
+        # ldm_init.initialise_launchd_me()
