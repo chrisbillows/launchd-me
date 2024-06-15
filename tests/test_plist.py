@@ -2,9 +2,21 @@ import getpass
 from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
+from unittest import mock
 
 import pytest
 from launchd_me.plist import LaunchdMeInit, PListDbConnectionManager, UserConfig
+
+
+@pytest.fixture
+def mock_user_config(tmp_path):
+    """Create a valid UserConfig for testing.
+
+    Uses a `tmp path` for the user's root directory.
+    """
+    mock_user_dir = tmp_path
+    mock_user_config = UserConfig(mock_user_dir)
+    return mock_user_config
 
 
 class TestAllProjectObjectsInitialiseAsExpected:
@@ -31,15 +43,6 @@ class TestAllProjectObjectsInitialiseAsExpected:
         user_config = UserConfig()
         actual_attributes = set(user_config.__dict__.keys())
         assert expected_attributes == actual_attributes
-
-    def test_launchd_me_init_initialises_with_correct_attributes(self):
-        """Initialise LaunchdMeInit object correctly.
-
-        Checks all expected attributes are present and there are no unexpected attributes.
-        """
-        user_config = UserConfig()
-        ldm_init = LaunchdMeInit(user_config)
-        assert isinstance(ldm_init._user_config, UserConfig)
 
 
 @dataclass
@@ -224,7 +227,7 @@ class TestPlistDBConnectionManager:
         DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
         teardown.
         """
-        self.mock = temp_env
+        # self.mock = temp_env
         self.mock_user_dir = Path(tmp_path)
         self.user_config = UserConfig(self.mock_user_dir)
         self.mock_app_dir = self.mock_user_dir / "launchd-me"
@@ -309,3 +312,35 @@ class TestPlistDBConnectionManager:
         finally:
             pldbcm.cursor.close()
             pldbcm.connection.close()
+
+
+class TestLaunchdMeInit:
+    def test_launchd_me_init_instantiates_as_expected(self, mock_user_config):
+        """Test `LaunchdMeInit()` instantiates as expected.
+
+        Passes the expected arguments and checks the instantiated object has the
+        expected attributes.
+        """
+        ldm_init = LaunchdMeInit(mock_user_config)
+        assert isinstance(ldm_init._user_config, UserConfig)
+
+    def test_initialise_launchd_me(self):
+        """Calls multiple methods so tested in integration tests."""
+
+    def test_create_app_directories(self, mock_user_config):
+        """Checks `_create_app_directores` behaves as expected."""
+        ldm = LaunchdMeInit(mock_user_config)
+        ldm._create_app_directories()
+        assert mock_user_config.plist_dir.exists()
+        assert mock_user_config.project_dir.exists()
+
+    def test_ensure_db_exists(self, mock_user_config):
+        """Test creates database.
+
+        Creates an empty `project_dir` and checks the method creates the database file
+        when it finds it is absent.
+        """
+        mock_user_config.project_dir.mkdir()
+        ldm = LaunchdMeInit(mock_user_config)
+        ldm._ensure_db_exists()
+        assert mock_user_config.ldm_db_file.exists()
