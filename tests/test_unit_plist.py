@@ -12,9 +12,9 @@ This serves the same pass as an `__init__` method. An autouse fixture is used as
 allows Pytest to carry out automatic setup and teardown.
 """
 
+import os
 import re
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from unittest.mock import MagicMock, Mock, patch
@@ -376,14 +376,36 @@ class TestPlistCreator:
     #     temp_plist_file_path = str(Path(tmp_path / plc_interval.plist_file_name))
     #     assert actual == temp_plist_file_path
 
-    def test_generate_file_name(self):
-        pass
+    def test_generate_file_name(self, plc_interval):
+        """Test file name generation.
 
-    def test_write_file(self):
-        pass
+        Attributes
+        ----------
+        plc_interval: PlistCreator
+            A fixture providing an instantiated PlistCreator instance. The instance
+            uses a fixture providing a UserConfig instance where the `user_dir` is
+            a tmp_path and the attribute user_name has been manually overwritten as
+            `mock_user_name`
+        """
+        ldm_init = LaunchdMeInit(plc_interval._user_config)
+        ldm_init.initialise_launchd_me()
+        actual = plc_interval._generate_file_name()
+        expected = "local.mock_user_name.interval_task_0001.plist"
+        assert actual == expected
 
-    def test_make_script_executable(self):
-        pass
+    def test_write_file_and_make_script_executable(self, plc_interval, tmp_path):
+        """Test writing mock content to a mock file.
+
+        Creates an empty mock file, writes content to it then makes it an exectuable.
+        """
+        mock_file = tmp_path / "mock_file"
+        mock_content = "123\n456\n789"
+        plc_interval._write_file(mock_file, mock_content)
+        plc_interval.path_to_script_to_automate = mock_file
+        plc_interval._make_script_executable()
+        assert mock_file.exists()
+        assert mock_file.read_text() == mock_content
+        assert os.access(mock_file, os.X_OK)
 
     @pytest.mark.parametrize(
         "calendar_schedule",
