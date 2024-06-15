@@ -254,6 +254,7 @@ class PlistCreator:
         description: str,
         make_executable: bool,
         auto_install: bool,
+        user_config: UserConfig,
     ):
         """
         Attributes
@@ -278,7 +279,7 @@ class PlistCreator:
         self.description: str = description
         self.make_executable: bool = make_executable
         self.auto_install: bool = auto_install
-        self._user_config: UserConfig = UserConfig()
+        self._user_config = user_config
         self.template_path = self._user_config.plist_template_path
         self.project_dir = self._user_config.project_dir
         self.plist_db_setter: PlistDbSetters = PlistDbSetters()
