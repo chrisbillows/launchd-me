@@ -335,9 +335,9 @@ class TestPlistInstallationManager:
         """Auto use objects throughout class.
 
         Creates a `UserConfig` with a `tmp_path` as the user directory. Creates an empty
-        Mock PlistDBSetter, necessary for creating a PlistInsallationManager.
+        Mock PlistDBSetter, necessary for instantiating a PlistInsallationManager.
 
-        Also creates an empty file in the `mock_user_dir` - `mock_plist` as a stand-in
+        Creates an empty file in the `mock_user_dir` called `mock_plist` as a stand-in
         plist file.
         """
         self.mock_user_dir = Path(tmp_path)
@@ -349,8 +349,8 @@ class TestPlistInstallationManager:
         self.mock_plist = self.mock_user_dir / self.mock_plist_filename
         self.mock_plist.touch()
 
-    def test_plist_installation_manager_init(self):
-        """Assert PlistInstallationManager object has the expected attributes."""
+    def test_plist_installation_manager_insantiates_as_expected(self):
+        """Instantiate using expected arguments and with expected attributes."""
         assert self.plim.user_config is not None
         assert self.plim.plist_db_setters is not None
 
