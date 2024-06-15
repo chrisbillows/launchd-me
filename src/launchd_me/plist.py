@@ -289,7 +289,8 @@ class PlistCreator:
         if self.schedule_type == "calendar":
             self._validate_calendar_schedule(self.schedule)
         plist_filename = self._generate_file_name()
-        plist_content = self._create_plist_content(plist_filename)
+        schedule_block = self._create_interval_schedule_block()
+        plist_content = self._create_plist_content(plist_filename, schedule_block)
         plist_file_path = Path(self._user_config.plist_dir / plist_filename)
         self._write_file(plist_file_path, plist_content)
         plist_id = self.plist_db_setter.add_newly_created_plist_file(
@@ -419,17 +420,13 @@ class PlistCreator:
         )
         return calendar_block
 
-    def _create_plist_content(self, plist_filename):
+    def _create_plist_content(self, plist_filename, schedule_block) -> str:
         """Create plist body content.
 
         Replaces the plist template  `{{PLACEHOLDERS}}` with required details.
-
-
-
         """
         with open(self.template_path, "r") as file:
             content = file.read()
-        schedule_block = self._create_interval_schedule_block()
         content = content.replace("{{SCHEDULE_BLOCK}}", schedule_block)
         content = content.replace("{{NAME_OF_PLIST_FILE}}", plist_filename)
         content = content.replace(
