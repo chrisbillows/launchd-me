@@ -31,13 +31,14 @@ from launchd_me.plist import (
 
 
 @pytest.fixture
-def mock_user_config(tmp_path):
+def mock_user_config(tmp_path) -> UserConfig:
     """Create a valid UserConfig for testing.
 
     Uses a `tmp path` for the user's root directory.
     """
     mock_user_dir = tmp_path
     mock_user_config = UserConfig(mock_user_dir)
+    mock_user_config.user_name = "mock_user_name"
     return mock_user_config
 
 
@@ -294,16 +295,22 @@ class TestPlistInstallationManager:
 
 
 @pytest.fixture
-def plc_interval():
+def plc_interval(mock_user_config) -> PlistCreator:
     mock_script = Path("interval_task.py")
     plc = PlistCreator(
-        mock_script, ScheduleType.interval, 300, "A description", True, True
+        mock_script,
+        ScheduleType.interval,
+        300,
+        "A description",
+        True,
+        True,
+        mock_user_config,
     )
     return plc
 
 
 @pytest.fixture
-def plc_calendar():
+def plc_calendar(mock_user_config) -> PlistCreator:
     mock_script = Path("calendar_task.py")
     plc = PlistCreator(
         mock_script,
@@ -312,6 +319,7 @@ def plc_calendar():
         "A description",
         True,
         True,
+        mock_user_config,
     )
     return plc
 
