@@ -42,7 +42,7 @@ def mock_user_config(tmp_path) -> UserConfig:
     return mock_user_config
 
 
-class TestAllProjectObjectsInitialiseAsExpected:
+class TestUserConfig:
     """Basic tests that ensure all objects initialise as future tests expect.
 
     Newly added classes should be added here.
