@@ -12,6 +12,7 @@ This serves the same pass as an `__init__` method. An autouse fixture is used as
 allows Pytest to carry out automatic setup and teardown.
 """
 
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,8 +22,10 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from launchd_me.plist import (
     LaunchdMeInit,
+    PlistCreator,
     PListDbConnectionManager,
     PlistInstallationManager,
+    ScheduleType,
     UserConfig,
 )
 
@@ -288,3 +291,158 @@ class TestPlistInstallationManager:
         """Assert an generic non-zero CLI call raises an error."""
         with pytest.raises(subprocess.CalledProcessError):
             self.plim._run_command_line_tool("grep", "hello", self.mock_plist)
+
+
+@pytest.fixture
+def plc_interval():
+    mock_script = Path("interval_task.py")
+    plc = PlistCreator(
+        mock_script, ScheduleType.interval, 300, "A description", True, True
+    )
+    return plc
+
+
+@pytest.fixture
+def plc_calendar():
+    mock_script = Path("calendar_task.py")
+    plc = PlistCreator(
+        mock_script,
+        ScheduleType.calendar,
+        {"Day": 15, "Hour": 15},
+        "A description",
+        True,
+        True,
+    )
+    return plc
+
+
+class TestPlistCreator:
+    def test_plist_creator_initialisation_with_interval_schedule(self, plc_interval):
+        assert plc_interval.path_to_script_to_automate == Path("interval_task.py")
+        assert plc_interval.schedule_type == ScheduleType.interval
+        assert plc_interval.schedule == 300
+        assert plc_interval.description == "A description"
+        assert plc_interval.make_executable == True
+        assert plc_interval.auto_install == True
+
+    def test_plist_creator_initialisation_with_calendar_schedule(self, plc_calendar):
+        assert plc_calendar.path_to_script_to_automate == Path("calendar_task.py")
+        assert plc_calendar.schedule_type == ScheduleType.calendar
+        assert plc_calendar.schedule == {"Day": 15, "Hour": 15}
+        assert plc_calendar.description == "A description"
+        assert plc_calendar.make_executable == True
+        assert plc_calendar.auto_install == True
+
+    # TODO: Move to integration tests - are we building as a part of this? Now driver.
+    # def test_generate_plist_file_interval(plc_interval, tmp_path):
+    #     temp_plist_dir = tmp_path
+    #     plc_interval.generate_plist_file(temp_plist_dir)
+
+    #     temp_plist_file_path = str(Path(tmp_path / plc_interval.plist_file_name))
+    #     plutil_verdict = subprocess.run(
+    #         ["plutil", temp_plist_file_path], capture_output=True, text=True
+    #     )
+    #     actual_returncode = plutil_verdict.returncode
+    #     actual_stdout_suffix = re.search(r":\s*(.*)", plutil_verdict.stdout).group(1)
+
+    #     assert actual_returncode == 0
+    #     assert actual_stdout_suffix == "OK"
+
+    # def test_generate_plist_file_calendar(plc_calendar, tmp_path):
+    #     temp_plist_dir = tmp_path
+    #     plc_calendar.generate_plist_file(temp_plist_dir)
+
+    #     temp_plist_file_path = str(Path(tmp_path / plc_calendar.plist_file_name))
+    #     plutil_verdict = subprocess.run(
+    #         ["plutil", temp_plist_file_path], capture_output=True, text=True
+    #     )
+    #     actual_returncode = plutil_verdict.returncode
+    #     actual_stdout_suffix = re.search(r":\s*(.*)", plutil_verdict.stdout).group(1)
+
+    #     assert actual_returncode == 0
+    #     assert actual_stdout_suffix == "OK"
+
+    # def test_generate_plist_file_interval_returns_file_path(plc_interval, tmp_path):
+    #     temp_plist_dir = tmp_path
+    #     actual = plc_interval.generate_plist_file(temp_plist_dir)
+    #     temp_plist_file_path = str(Path(tmp_path / plc_interval.plist_file_name))
+    #     assert actual == temp_plist_file_path
+
+    def test_generate_file_name(self):
+        pass
+
+    def test_write_file(self):
+        pass
+
+    def test_make_script_executable(self):
+        pass
+
+    @pytest.mark.parametrize(
+        "calendar_schedule",
+        [
+            {"Month": 12},
+            {"Day": 31},
+            {"Hour": 22},
+            {"Minute": 55},
+            {"Weekday": 0},
+            {"Day": 15, "Hour": 15},
+            {"Month": 12, "Day": 31, "Hour": 22, "Minute": 55},
+        ],
+    )
+    def test_validate_calendar_schedule_with_valid_keys_values(
+        self, plc_calendar, calendar_schedule
+    ):
+        expected = None
+        actual = plc_calendar._validate_calendar_schedule(calendar_schedule)
+        assert actual == expected
+
+    @pytest.mark.parametrize(
+        "calendar_schedule",
+        [
+            {"": 1},
+            {"Invalid": 1},
+            {"HOUR": 1},
+            {"month": 1},
+            {"wEEkdAy": 1},
+        ],
+    )
+    def test_validate_calendar_schedule_with_invalid_keys(
+        self, plc_calendar, calendar_schedule
+    ):
+        with pytest.raises(Exception):
+            plc_calendar._validate_calendar_schedule(calendar_schedule)
+
+    @pytest.mark.parametrize(
+        "calendar_schedule",
+        [
+            {"Month": 15},
+            {"Day": 0},
+            {"Hour": 25},
+            {"Minute": -2},
+            {"Weekday": 8},
+        ],
+    )
+    def test_validate_calendar_schedule_with_invalid_values(
+        self, plc_calendar, calendar_schedule
+    ):
+        with pytest.raises(Exception):
+            plc_calendar._validate_calendar_schedule(calendar_schedule)
+
+    def test_create_interval_schedule_block(self, plc_interval):
+        expected = "<key>StartInterval</key>\n\t<integer>300</integer>"
+        actual = plc_interval._create_interval_schedule_block()
+        assert actual == expected
+
+    def test_create_calendar_schedule_block(self, plc_calendar):
+        expected = (
+            "<key>StartCalendarInterval</key>"
+            "\n\t<dict>"
+            "\n\t\t<key>Day</key>\n\t\t<integer>15</integer>"
+            "\n\t\t<key>Hour</key>\n\t\t<integer>15</integer>"
+            "\n\t</dict>"
+        )
+        actual = plc_calendar._create_calendar_schedule_block()
+        assert actual == expected
+
+    def test_create_plist_content(self):
+        pass
