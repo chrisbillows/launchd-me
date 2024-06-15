@@ -420,16 +420,11 @@ class PlistCreator:
         return calendar_block
 
     def _create_plist_content(self, plist_filename):
-        """Updates plist template with required script and schedule details.
+        """Create plist body content.
 
-        The new plist file is named after the script (without its extension) with a
-        '.plist' extension.
+        Replaces the plist template  `{{PLACEHOLDERS}}` with required details.
 
-        Examples
-        --------
-        >>> creator = PlistCreator('my_script.py', 'interval', 3600)
-        >>> creator.create_plist()
-        Plist file created at <project_dir>/plist_files/local.cbillows.my_script.plist
+
 
         """
         with open(self.template_path, "r") as file:
