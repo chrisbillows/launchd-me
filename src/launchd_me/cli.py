@@ -16,7 +16,7 @@ from launchd_me.plist import (
     UserConfig,
 )
 
-USER_CONF = UserConfig()
+USER_CONFIG = UserConfig()
 
 
 def valid_path(path_str):
@@ -114,6 +114,7 @@ def create_plist(args):
         args.description,
         args.make_executable,
         args.auto_install,
+        USER_CONFIG,
     )
     logger.debug("Calling PlistCreator.driver()")
     plc.driver()
@@ -134,13 +135,13 @@ def list_plists(args):
 
 
 def install_plist(args):
-    db_getter = PlistDbGetters(USER_CONF)
-    db_setter = PlistDbSetters(USER_CONF)
-    install_manager = PlistInstallationManager(USER_CONF, db_setter)
+    db_getter = PlistDbGetters(USER_CONFIG)
+    db_setter = PlistDbSetters(USER_CONFIG)
+    install_manager = PlistInstallationManager(USER_CONFIG, db_setter)
     db_getter.verify_plist_id_valid(args.plist_id)
     plist_detail = db_getter.get_a_single_plist_file(args.plist_id)
     plist_filename = Path(plist_detail["PlistFileName"])
-    plist_file_path = Path(USER_CONF.plist_dir) / plist_filename
+    plist_file_path = Path(USER_CONFIG.plist_dir) / plist_filename
     install_manager.install_plist(args.plist_id, plist_file_path)
 
 
@@ -157,13 +158,13 @@ def uninstall_plist(args: argparse.Namespace) -> None:
     uninstall command is called.
 
     """
-    db_getter = PlistDbGetters(USER_CONF)
-    db_setter = PlistDbSetters(USER_CONF)
-    install_manager = PlistInstallationManager(USER_CONF, db_setter)
+    db_getter = PlistDbGetters(USER_CONFIG)
+    db_setter = PlistDbSetters(USER_CONFIG)
+    install_manager = PlistInstallationManager(USER_CONFIG, db_setter)
     db_getter.verify_plist_id_valid(args.plist_id)
     plist_detail = db_getter.get_a_single_plist_file(args.plist_id)
     plist_file_name = Path(plist_detail["PlistFileName"])
-    symlink_to_plist = USER_CONF.launch_agents_dir / plist_file_name
+    symlink_to_plist = USER_CONFIG.launch_agents_dir / plist_file_name
     install_manager.uninstall_plist(args.plist_id, symlink_to_plist)
 
 
