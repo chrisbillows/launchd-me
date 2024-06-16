@@ -1,4 +1,3 @@
-import getpass
 from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
@@ -39,7 +38,8 @@ def temp_env(tmp_path) -> ConfiguredEnvironmentObjects:
     Doubles as an integration test for `UserConfig` and `LaunchdMeInit`.
 
     Creates a temporary environment with application directories and a db file using a
-    Pytest `tmp_path` as the user's home dir.
+    Pytest `tmp_path` as the user's home dir. Overwrites the loaded `user_name` with
+    `mock.user` for consistency.
 
     This can be used to allow real reading and writing to a database during testing and
     minimise the need for mocking.
@@ -52,6 +52,7 @@ def temp_env(tmp_path) -> ConfiguredEnvironmentObjects:
     """
     temp_user_dir = tmp_path
     user_config = UserConfig(temp_user_dir)
+    user_config.user_name = "mockuser"
     ldm_init = LaunchdMeInit(user_config)
     ldm_init.initialise_launchd_me()
     temp_env = ConfiguredEnvironmentObjects(temp_user_dir, user_config, ldm_init)
@@ -77,12 +78,8 @@ class TestTheTempEnvTestEnvironment:
         self.temp_env = temp_env
 
     def test_tmp_env_username(self):
-        """Test the temp env has a configured user name. Name itself doesn't matter.
-
-        Primarily to see if test machines e.g. GitHub actions VM, docker builds can be
-        relied upon to have this set.
-        """
-        assert self.temp_env.user_config.user_name == getpass.getuser()
+        """Test the temp env has the configured user name."""
+        assert self.temp_env.user_config.user_name == "mockuser"
 
     def test_temp_env_paths_to_application_files_and_directories(self):
         """Test application directory and file paths are correct."""
