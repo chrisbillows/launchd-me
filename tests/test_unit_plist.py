@@ -342,41 +342,6 @@ class TestPlistCreator:
         assert plc_calendar.make_executable == True
         assert plc_calendar.auto_install == True
 
-    # TODO: Move to integration tests - are we building as a part of this? Now driver.
-    # def test_generate_plist_file_interval(plc_interval, tmp_path):
-    #     temp_plist_dir = tmp_path
-    #     plc_interval.generate_plist_file(temp_plist_dir)
-
-    #     temp_plist_file_path = str(Path(tmp_path / plc_interval.plist_file_name))
-    #     plutil_verdict = subprocess.run(
-    #         ["plutil", temp_plist_file_path], capture_output=True, text=True
-    #     )
-    #     actual_returncode = plutil_verdict.returncode
-    #     actual_stdout_suffix = re.search(r":\s*(.*)", plutil_verdict.stdout).group(1)
-
-    #     assert actual_returncode == 0
-    #     assert actual_stdout_suffix == "OK"
-
-    # def test_generate_plist_file_calendar(plc_calendar, tmp_path):
-    #     temp_plist_dir = tmp_path
-    #     plc_calendar.generate_plist_file(temp_plist_dir)
-
-    #     temp_plist_file_path = str(Path(tmp_path / plc_calendar.plist_file_name))
-    #     plutil_verdict = subprocess.run(
-    #         ["plutil", temp_plist_file_path], capture_output=True, text=True
-    #     )
-    #     actual_returncode = plutil_verdict.returncode
-    #     actual_stdout_suffix = re.search(r":\s*(.*)", plutil_verdict.stdout).group(1)
-
-    #     assert actual_returncode == 0
-    #     assert actual_stdout_suffix == "OK"
-
-    # def test_generate_plist_file_interval_returns_file_path(plc_interval, tmp_path):
-    #     temp_plist_dir = tmp_path
-    #     actual = plc_interval.generate_plist_file(temp_plist_dir)
-    #     temp_plist_file_path = str(Path(tmp_path / plc_interval.plist_file_name))
-    #     assert actual == temp_plist_file_path
-
     def test_generate_file_name(self, plc_interval):
         """Test file name generation.
 
@@ -492,6 +457,3 @@ class TestPlistCreator:
             plist_file.parent.mkdir(parents=True)
             plist_file.write_text(content)
             assert subprocess.run(["plutil", "-lint", str(plist_file)])
-
-        # ldm_init = LaunchdMeInit(mock_user_config)
-        # ldm_init.initialise_launchd_me()

@@ -273,16 +273,17 @@ class PlistCreator:
 
         """
         self.path_to_script_to_automate: Path = path_to_script_to_automate
-        self.script_to_automate_name: str = self.path_to_script_to_automate.name
         self.schedule_type = schedule_type
         self.schedule = schedule
         self.description: str = description
         self.make_executable: bool = make_executable
         self.auto_install: bool = auto_install
         self._user_config = user_config
+        self.db_setter: PlistDbSetters = PlistDbSetters()
+
+        self.script_to_automate_name: str = self.path_to_script_to_automate.name
         self.template_path = self._user_config.plist_template_path
         self.project_dir = self._user_config.project_dir
-        self.plist_db_setter: PlistDbSetters = PlistDbSetters()
 
     def driver(self, plist_dir=None) -> Path:
         """Driver function."""
@@ -293,7 +294,7 @@ class PlistCreator:
         plist_content = self._create_plist_content(plist_filename, schedule_block)
         plist_file_path = Path(self._user_config.plist_dir / plist_filename)
         self._write_file(plist_file_path, plist_content)
-        plist_id = self.plist_db_setter.add_newly_created_plist_file(
+        plist_id = self.db_setter.add_newly_created_plist_file(
             plist_filename,
             self.path_to_script_to_automate.name,
             self.schedule_type,
@@ -303,8 +304,9 @@ class PlistCreator:
         if self.make_executable:
             self._make_script_executable()
         if self.auto_install:
-            db_setter = PlistDbSetters()
-            plist_installer = PlistInstallationManager(self._user_config, db_setter)
+            plist_installer = PlistInstallationManager(
+                self._user_config, self.db_setter
+            )
             plist_installer.install_plist(plist_id, plist_file_path)
         return plist_file_path
 

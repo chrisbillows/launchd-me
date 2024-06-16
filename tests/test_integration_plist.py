@@ -1,11 +1,15 @@
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
+from unittest.mock import ANY, patch
 
 import pytest
 from launchd_me.plist import (
     LaunchdMeInit,
+    PlistCreator,
     PListDbConnectionManager,
+    ScheduleType,
     UserConfig,
 )
 
@@ -163,3 +167,56 @@ class TestTheTempEnvTestEnvironment:
             connection = cursor.connection
         assert isinstance(connection, Connection)
         assert isinstance(cursor, Cursor)
+
+
+class TestPlistCreatorGeneratePlist:
+    def test_generate_valid_interval_plist_file_and_add_to_database(self, temp_env):
+        """Generate an inverval plist file, validate, patch install and update db.
+
+        Creates `mock_script` that the plist will automate. Make a `LaunchAgents` dir
+        in the temp user_environment.  Instantiates a PlistCreator with the details for
+        `mock_script` and with `make_exectuable` and `auto_install` set to true.
+
+        The PlistCreator's driver function is called. . The call patches
+        a PlistInstallationManager's `run_command_line_tool` method so the plist file
+        isn't loaded. (This means the plist outout also isn't validated with `plutil` -
+        this is covered in a unit test.)
+
+        The test asserts the plist file is created with spot checks of selected content,
+        that `_run_command_line_tool` was called with the plist installation commands
+        and that the database now contains details of the generated plist.
+        """
+        mock_script = temp_env.user_config.user_dir / "interval_task.py"
+        mock_script.touch()
+        temp_env.user_config.launch_agents_dir.mkdir(parents=True)
+        plc = PlistCreator(
+            mock_script,
+            ScheduleType.interval,
+            300,
+            "A description",
+            True,
+            True,
+            temp_env.user_config,
+        )
+        with patch(
+            "launchd_me.plist.PlistInstallationManager._run_command_line_tool"
+        ) as mock_run_command_line_tool:
+            plist_file_path = plc.driver()
+
+        # TODO: The database is still empty.
+        connection = Connection(temp_env.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT PlistFileID, PlistFileName, ScriptName, CreatedDate, "
+            "ScheduleType, ScheduleValue, CurrentState FROM PlistFiles"
+            " ORDER BY PlistFileID"
+        )
+        all_rows = cursor.fetchall()
+        print("Hello")
+        print(all_rows)
+        cursor.close()
+        connection.close()
+        mock_run_command_line_tool.assert_called_with("launchctl", "load", ANY)
+        assert plist_file_path.name == "local.mockuser.interval_task_0001.plist"
+        assert subprocess.run(["plutil", "-lint", plist_file_path])
+        assert 1 == 2
