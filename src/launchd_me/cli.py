@@ -121,8 +121,7 @@ def create_plist(args):
 
 
 def list_plists(args):
-    user_config = UserConfig()
-    db_getters = PlistDbGetters(user_config)
+    db_getters = PlistDbGetters(USER_CONFIG)
     if args.plist_id:
         db_plist_displayer = DBPlistDetailDisplayer()
         row = db_getters.get_a_single_plist_file(args.plist_id)

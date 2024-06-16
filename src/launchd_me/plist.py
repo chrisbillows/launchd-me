@@ -279,7 +279,7 @@ class PlistCreator:
         self.make_executable: bool = make_executable
         self.auto_install: bool = auto_install
         self._user_config = user_config
-        self.db_setter: PlistDbSetters = PlistDbSetters()
+        self.db_setter: PlistDbSetters = PlistDbSetters(self._user_config)
 
         self.script_to_automate_name: str = self.path_to_script_to_automate.name
         self.template_path = self._user_config.plist_template_path
@@ -447,9 +447,11 @@ class PlistCreator:
 
 
 class PlistDbSetters:
-    @staticmethod
+    def __init__(self, user_config: UserConfig) -> None:
+        self.user_config = user_config
+    
     def add_newly_created_plist_file(
-        plist_filename, script_name, schedule_type, schedule_value, description
+        self, plist_filename, script_name, schedule_type, schedule_value, description
     ):
         now = datetime.now().isoformat()
         insert_sql = """
@@ -465,7 +467,7 @@ class PlistDbSetters:
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """
         logger.debug("Adding new plist file to database.")
-        with PListDbConnectionManager(UserConfig()) as cursor:
+        with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 insert_sql,
                 (
@@ -480,23 +482,22 @@ class PlistDbSetters:
             )
         return cursor.lastrowid
 
-    @staticmethod
-    def add_installed_installation_status(file_id):
-        with PListDbConnectionManager(UserConfig()) as cursor:
+    def add_installed_installation_status(self, file_id):
+        with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 "UPDATE PlistFiles SET CurrentState = 'running' WHERE PlistFileID = ?",
                 (file_id,),
             )
 
     def add_uninstalled_installation_status(self, file_id):
-        with PListDbConnectionManager(UserConfig()) as cursor:
+        with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 "UPDATE PlistFiles SET CurrentState = 'inactive' WHERE PlistFileID = ?",
                 (file_id,),
             )
         logger.debug(f"Plist {file_id} now has 'inactive' status.")
 
-    def add_deleted_installation_status():
+    def add_deleted_installation_status(self):
         pass
 
 
