@@ -171,6 +171,7 @@ class TestTheTempEnvTestEnvironment:
 
 class TestPlistCreatorGeneratePlist:
     def test_generate_valid_interval_plist_file_and_add_to_database(self, temp_env):
+        # TODO: Check the docstring and should be done!
         """Generate an inverval plist file, validate, patch install and update db.
 
         Creates `mock_script` that the plist will automate. Make a `LaunchAgents` dir
@@ -203,7 +204,6 @@ class TestPlistCreatorGeneratePlist:
         ) as mock_run_command_line_tool:
             plist_file_path = plc.driver()
 
-        # TODO: The database is still empty.
         connection = Connection(temp_env.user_config.ldm_db_file)
         cursor = connection.cursor()
         cursor.execute(
@@ -212,11 +212,14 @@ class TestPlistCreatorGeneratePlist:
             " ORDER BY PlistFileID"
         )
         all_rows = cursor.fetchall()
-        print("Hello")
-        print(all_rows)
         cursor.close()
         connection.close()
         mock_run_command_line_tool.assert_called_with("launchctl", "load", ANY)
         assert plist_file_path.name == "local.mockuser.interval_task_0001.plist"
         assert subprocess.run(["plutil", "-lint", plist_file_path])
-        assert 1 == 2
+        assert all_rows[0][0:3] == (
+            1,
+            "local.mockuser.interval_task_0001.plist",
+            "interval_task.py",
+        )
+        assert all_rows[0][4:7] == ("interval", "300", "running")
