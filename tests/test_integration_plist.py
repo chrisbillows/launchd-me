@@ -196,6 +196,7 @@ class TestPlistCreatorGeneratePlist:
 
     @pytest.fixture(autouse=True)
     def run_plist_creator_driver_in_the_temp_env_environment(self, temp_env):
+        # TODO: Should just be docstrings left. Again!
         """Fixture to pass the temp env to all test class methods.
 
         DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
@@ -221,12 +222,6 @@ class TestPlistCreatorGeneratePlist:
         ) as self.mock_run_command_line_tool:
             self.plist_file_path = self.plc.driver()
 
-    # def test_new_fixture(self):
-    #     print(self.mock_script)
-    #     print(self.temp_env.user_config.launch_agents_dir.exists())
-    #     print(self.plc.description)
-    #     assert 1 == 1
-
     def test_plist_driver_created_plist_file(self):
         """Assert a file was created."""
         assert self.plist_file_path.exists()
@@ -248,17 +243,36 @@ class TestPlistCreatorGeneratePlist:
     ):
         """Assert the created file has spot checks of selected content."""
         actual_plist_content = self.plist_file_path.read_text().split("\n")
-        for line in actual_plist_content:
-            print(line)
         assert actual_plist_content[line_index].strip() == expected_line_content
 
-    def test_plist_creator_driver_created_paths_correctly(self):
-        pass
+    @pytest.mark.parametrize(
+        "line_index, expected_end_string",
+        [
+            (12, "</string>"),
+            (
+                16,
+                "/launchd-me/logs/local.mockuser.interval_task_0001.plist_std_out.log</string>",
+            ),
+            (
+                18,
+                "/launchd-me/logs/local.mockuser.interval_task_0001.plist_err.log</string>",
+            ),
+        ],
+    )
+    def test_plist_creator_driver_created_paths_correctly(
+        self, line_index, expected_end_string
+    ):
+        actual_plist_content = self.plist_file_path.read_text().split("\n")
+        working_dir = self.temp_env.user_config.user_dir
+        assert (
+            actual_plist_content[line_index].strip()
+            == f"<string>{working_dir}{expected_end_string}"
+        )
 
-    # def test_
-    #     # Assert plist is valid if test running on macOS.
-    #     if sys.platform == "darwin":
-    #         assert subprocess.run(["plutil", "-lint", plist_file_path])
+    @pytest.mark.skipif(sys.platform != "darwin", reason="Test runs only on macOS")
+    def test_plist_creator_created_a_valid_plist_file(self):
+        """Uses `plutil -lint` which tests the created plist file is valid."""
+        assert subprocess.run(["plutil", "-lint", self.plist_file_path])
 
     def test_plist_creator_created_a_symlink_in_the_mock_launch_agents_dir(self):
         """Assert the plist file symlink is created in LaunchAgents."""
