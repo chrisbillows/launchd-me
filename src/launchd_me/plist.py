@@ -280,7 +280,6 @@ class PlistCreator:
         self.auto_install: bool = auto_install
         self._user_config = user_config
         self.db_setter: PlistDbSetters = PlistDbSetters(self._user_config)
-
         self.script_to_automate_name: str = self.path_to_script_to_automate.name
         self.template_path = self._user_config.plist_template_path
         self.project_dir = self._user_config.project_dir
@@ -449,7 +448,7 @@ class PlistCreator:
 class PlistDbSetters:
     def __init__(self, user_config: UserConfig) -> None:
         self.user_config = user_config
-    
+
     def add_newly_created_plist_file(
         self, plist_filename, script_name, schedule_type, schedule_value, description
     ):

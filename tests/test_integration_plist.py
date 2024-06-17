@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
@@ -171,25 +172,32 @@ class TestTheTempEnvTestEnvironment:
 
 class TestPlistCreatorGeneratePlist:
     def test_generate_valid_interval_plist_file_and_add_to_database(self, temp_env):
-        # TODO: Check the docstring and should be done!
-        """Generate an inverval plist file, validate, patch install and update db.
+        """Create, validate and install a plist. Update the database.
 
-        Creates `mock_script` that the plist will automate. Make a `LaunchAgents` dir
-        in the temp user_environment.  Instantiates a PlistCreator with the details for
-        `mock_script` and with `make_exectuable` and `auto_install` set to true.
+        Creates `mock_script` that the plist will automate. Makes a `LaunchAgents` dir
+        in the temp user_environment to install the plist file symlink into. I
+        nstantiates a PlistCreator with the details for `mock_script` and with
+        `make_exectuable` and `auto_install` set to true.
 
-        The PlistCreator's driver function is called. . The call patches
-        a PlistInstallationManager's `run_command_line_tool` method so the plist file
-        isn't loaded. (This means the plist outout also isn't validated with `plutil` -
-        this is covered in a unit test.)
+        The PlistCreator's driver function is called. The call patches
+        a PlistInstallationManager's `run_command_line_tool` method so no command line
+        calls are made. This means the plist output isn't validated with `plutil` so
+        `plutil` validation is added as an assertion when run on macOS.
 
-        The test asserts the plist file is created with spot checks of selected content,
-        that `_run_command_line_tool` was called with the plist installation commands
-        and that the database now contains details of the generated plist.
+        The test asserts the plist file is created with spot checks of selected content.
+        When run on macOS the test asserts the plist file is valid.
+
+        The test asserts that a symlink to the plist was created in the mock
+        `LaunchAgents` dir.
+
+        It assets `_run_command_line_tool` was called with the plist installation
+        commands. And it asserts that the database now contains details of the
+        generated plist (it does not check the plist creation date).
         """
         mock_script = temp_env.user_config.user_dir / "interval_task.py"
         mock_script.touch()
         temp_env.user_config.launch_agents_dir.mkdir(parents=True)
+
         plc = PlistCreator(
             mock_script,
             ScheduleType.interval,
@@ -204,6 +212,8 @@ class TestPlistCreatorGeneratePlist:
         ) as mock_run_command_line_tool:
             plist_file_path = plc.driver()
 
+        expected_plist_content = plist_file_path.read_text().split("\n")
+
         connection = Connection(temp_env.user_config.ldm_db_file)
         cursor = connection.cursor()
         cursor.execute(
@@ -214,9 +224,30 @@ class TestPlistCreatorGeneratePlist:
         all_rows = cursor.fetchall()
         cursor.close()
         connection.close()
-        mock_run_command_line_tool.assert_called_with("launchctl", "load", ANY)
+
+        # Assert plist file and content is as expected.
         assert plist_file_path.name == "local.mockuser.interval_task_0001.plist"
-        assert subprocess.run(["plutil", "-lint", plist_file_path])
+        assert plist_file_path.exists()
+        assert (
+            expected_plist_content[5].strip()
+            == "<string>local.mockuser.interval_task_0001.plist</string>"
+        )
+        assert expected_plist_content[9].strip() == "<string>interval_task.py</string>"
+        assert expected_plist_content[18].endswith(
+            "/logs/local.mockuser.interval_task_0001.plist_err.log</string>"
+        )
+        # Assert plist is valid if test running on macOS.
+        if sys.platform == "darwin":
+            assert subprocess.run(["plutil", "-lint", plist_file_path])
+        # Assert the plist symlink was created in launch agents.
+        assert (temp_env.user_config.launch_agents_dir / plist_file_path.name).exists()
+        assert (
+            temp_env.user_config.launch_agents_dir / plist_file_path.name
+        ).is_symlink()
+        # Assert the call to load the plist symlink was made correctly.
+        mock_run_command_line_tool.assert_called_with("launchctl", "load", ANY)
+        # Assert the database details of the plist file are correct.
+        # Exclues [4] which is the plist creation timestamp.
         assert all_rows[0][0:3] == (
             1,
             "local.mockuser.interval_task_0001.plist",
