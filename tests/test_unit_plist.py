@@ -353,7 +353,7 @@ class TestPlistCreator:
             a tmp_path and the attribute user_name has been manually overwritten as
             `mock_user_name`
         """
-        ldm_init = LaunchdMeInit(plc_interval._user_config)
+        ldm_init = LaunchdMeInit(plc_interval.user_config)
         ldm_init.initialise_launchd_me()
         actual = plc_interval._generate_file_name()
         expected = "local.mock_user_name.interval_task_0001.plist"
@@ -424,7 +424,7 @@ class TestPlistCreator:
         with pytest.raises(Exception):
             plc_calendar._validate_calendar_schedule(calendar_schedule)
 
-    def test_create_interval_schedule_block(self, plc_interval):
+    def test_create_schedule_block(self, plc_interval):
         expected = "<key>StartInterval</key>\n\t<integer>300</integer>"
         actual = plc_interval._create_interval_schedule_block()
         assert actual == expected
@@ -453,7 +453,7 @@ class TestPlistCreator:
         assert content_lines[9] == line_idx_9
         assert content_lines[18].endswith(line_idx_18_ends)
         if sys.platform == "darwin":
-            plist_file = plc_interval._user_config.plist_dir / "test.plist"
+            plist_file = plc_interval.user_config.plist_dir / "test.plist"
             plist_file.parent.mkdir(parents=True)
             plist_file.write_text(content)
             assert subprocess.run(["plutil", "-lint", str(plist_file)])
