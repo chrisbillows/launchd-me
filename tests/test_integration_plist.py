@@ -173,41 +173,40 @@ class TestTheTempEnvTestEnvironment:
 class TestPlistCreatorGeneratePlist:
     """Create, validate and install an interval plist. Update the database.
 
-    Creates `mock_script` that the plist will automate. Makes a `LaunchAgents` dir
-    in the temp user_environment to install the plist file symlink into. I
-    nstantiates a PlistCreator with the details for `mock_script` and with
-    `make_exectuable` and `auto_install` set to true.
+    This tests all the methods called by the `PlistCreator.driver` when passed an
+    `interval` schedule. An entire version of the package environment is spun up with
+    `temp_env`.
 
-    The PlistCreator's driver function is called. The call patches
-    # a PlistInstallationManager's `run_command_line_tool` method so no command line
-    # calls are made. This means the plist output isn't validated with `plutil` so
-    # `plutil` validation is added as an assertion when run on macOS.
-
-    # The test asserts the plist file is created with spot checks of selected content.
-    # When run on macOS the test asserts the plist file is valid.
-
-    # The test asserts that a symlink to the plist was created in the mock
-    # `LaunchAgents` dir.
-
-    # It assets `_run_command_line_tool` was called with the plist installation
-    # commands. And it asserts that the database now contains details of the
-    # generated plist (it does not check the plist creation date).
+    The fixture `run_plist_creator_driver_in_the_temp_env_environment` generates the
+    outcome of running `PlistCreator.driver` and its outputs are passed to every
+    test in the class with `autouse`.
     """
 
     @pytest.fixture(autouse=True)
     def run_plist_creator_driver_in_the_temp_env_environment(self, temp_env):
-        # TODO: Should just be docstrings left. Again!
-        """Fixture to pass the temp env to all test class methods.
+        """Runs `PlistCreator.driver` and all class tests then `autouse` the results.
+
+        Creates `mock_script` that the plist will automate. Makes a `LaunchAgents` dir
+        in the temp user_environment to install the plist file symlink into.
+        Instantiates a PlistCreator with the details for `mock_script` and with
+        `make_exectuable` and `auto_install` set to true.
+
+        The PlistCreator's driver function is called. The call patches
+        a PlistInstallationManager's `run_command_line_tool` method so no command line
+        calls are made. This means the plist output isn't validated with `plutil` -
+        a stand-alone tests calls `plutil -lint` validation (on macOS only).
 
         DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
         teardown.
         """
-        self.temp_env = temp_env
-        self.mock_run_command_line_tool = MagicMock()
-        self.mock_script = temp_env.user_config.user_dir / "interval_task.py"
+        self.temp_env: ConfiguredEnvironmentObjects = temp_env
+        self.mock_run_command_line_tool: MagicMock = MagicMock()
+        self.mock_script: Path = temp_env.user_config.user_dir / "interval_task.py"
+        self.plc: PlistCreator = None
+        self.plist_file_path: Path = None
+
         self.mock_script.touch()
         self.temp_env.user_config.launch_agents_dir.mkdir(parents=True)
-
         self.plc = PlistCreator(
             self.mock_script,
             ScheduleType.interval,
@@ -223,7 +222,7 @@ class TestPlistCreatorGeneratePlist:
             self.plist_file_path = self.plc.driver()
 
     def test_plist_driver_created_plist_file(self):
-        """Assert a file was created."""
+        """Assert a plist file was created."""
         assert self.plist_file_path.exists()
 
     def test_plist_driver_created_plist_file_with_expected_name(self):
@@ -241,7 +240,7 @@ class TestPlistCreatorGeneratePlist:
     def test_plist_creator_driver_created_plist_file_with_expected_content(
         self, line_index, expected_line_content
     ):
-        """Assert the created file has spot checks of selected content."""
+        """Spot check lines in the created plist file."""
         actual_plist_content = self.plist_file_path.read_text().split("\n")
         assert actual_plist_content[line_index].strip() == expected_line_content
 
@@ -262,6 +261,7 @@ class TestPlistCreatorGeneratePlist:
     def test_plist_creator_driver_created_paths_correctly(
         self, line_index, expected_end_string
     ):
+        """Spot checks paths in the plist file constructed from `mock user dir`."""
         actual_plist_content = self.plist_file_path.read_text().split("\n")
         working_dir = self.temp_env.user_config.user_dir
         assert (
@@ -275,7 +275,7 @@ class TestPlistCreatorGeneratePlist:
         assert subprocess.run(["plutil", "-lint", self.plist_file_path])
 
     def test_plist_creator_created_a_symlink_in_the_mock_launch_agents_dir(self):
-        """Assert the plist file symlink is created in LaunchAgents."""
+        """Assert the plist file symlink is created in the mock LaunchAgents dir."""
         assert (
             self.temp_env.user_config.launch_agents_dir / self.plist_file_path.name
         ).exists()
