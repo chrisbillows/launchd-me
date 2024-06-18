@@ -1,0 +1,41 @@
+site_name: Launchd Me
+repo_url: https://github.com/chrisbillows/launchd-me
+repo_name: launchd-me
+theme:
+  name: material
+  logo: img/128px-Cartoon_space_rocket.png
+  favicon: img/favicon.ico
+  language: en
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+
+markdown_extensions:
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+
+plugins:
+- search
+- mkdocstrings
+
+nav:
+  - Home: index.md
+  - About: about.md
+  - Quickstart: user_guide.md
+  - API: API.md
