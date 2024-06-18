@@ -22,6 +22,7 @@ import pytest
 from launchd_me.plist import (
     LaunchdMeInit,
     PListDbConnectionManager,
+    PlistDbGetters,
     PlistInstallationManager,
     UserConfig,
 )
@@ -35,6 +36,7 @@ def mock_user_config(tmp_path):
     """
     mock_user_dir = tmp_path
     mock_user_config = UserConfig(mock_user_dir)
+    mock_user_config.user_name = "mockuser"
     return mock_user_config
 
 
@@ -288,3 +290,22 @@ class TestPlistInstallationManager:
         """Assert an generic non-zero CLI call raises an error."""
         with pytest.raises(subprocess.CalledProcessError):
             self.plim._run_command_line_tool("grep", "hello", self.mock_plist)
+
+
+class TestDbGetters:
+    # TODO: We can just create our own db and write some info to it, then check it is
+    # able to recover it correctly.
+
+    def test_init(self, mock_user_config):
+        # db_getter = PlistDbGetters(mock_user_config)
+        # assert db_getter._user_config.user_name == "mockuser"
+        pass
+
+    def test_verify_list_id_valid(self):
+        pass
+
+    def test_get_all_tracked_plist_files(self):
+        pass
+
+    def test_get_a_single_plist_file(self):
+        pass
