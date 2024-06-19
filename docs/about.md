@@ -1,9 +1,3 @@
----
-hide:
-  - navigation
-  - toc
----
-
 # Move ait quaerunt paelice imitetur elisa si
 
 ## Respiciens meque

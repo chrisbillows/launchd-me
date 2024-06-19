@@ -24,6 +24,8 @@ theme:
   features:
     - navigation.tabs
     - navigation.tabs.sticky
+    - toc.integrate
+    - toc.follow
 
 markdown_extensions:
   - pymdownx.caret
@@ -39,7 +41,7 @@ plugins:
             docstring_style: "numpy"  # Set the docstring style to NumPy
 
 nav:
-  - Home: index.md
-  - About: about.md
-  - Quickstart: user_guide.md
+  - Launchd Me: index.md
+  - Features: about.md
+  - User Guide: user_guide.md
   - API: API.md
