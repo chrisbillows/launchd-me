@@ -32,7 +32,11 @@ markdown_extensions:
 
 plugins:
 - search
-- mkdocstrings
+- mkdocstrings:
+      handlers:
+        python:
+          selection:
+            docstring_style: "numpy"  # Set the docstring style to NumPy
 
 nav:
   - Home: index.md
