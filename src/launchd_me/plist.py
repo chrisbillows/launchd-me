@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.table import Row, Table
 
 from launchd_me.logger_config import logger
+from launchd_me.sql_commands import INSERT_INTO_PLISTFILES_TABLE
 
 
 class ScheduleType(str, Enum):
@@ -462,22 +463,10 @@ class PlistDbSetters:
         self, plist_filename, script_name, schedule_type, schedule_value, description
     ):
         now = datetime.now().isoformat()
-        insert_sql = """
-        INSERT INTO PlistFiles (
-            PlistFileName,
-            ScriptName,
-            CreatedDate,
-            ScheduleType,
-            ScheduleValue,
-            CurrentState,
-            Description
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?);
-        """
         logger.debug("Adding new plist file to database.")
         with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
-                insert_sql,
+                INSERT_INTO_PLISTFILES_TABLE,
                 (
                     plist_filename,
                     script_name,

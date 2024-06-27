@@ -31,8 +31,9 @@ from launchd_me.plist import (
     ScheduleType,
     UserConfig,
 )
+from launchd_me.sql_commands import INSERT_INTO_PLISTFILES_TABLE
 
-from tests.conftest import mock_environment
+from tests.conftest import ConfiguredEnvironmentObjects
 
 
 @pytest.fixture
@@ -464,35 +465,58 @@ class TestPlistCreator:
 
 
 class TestDBSetters:
-    # @pytest.fixture(autouse=True)
-    # def setup_temp_env(self, tmp_path, mock_user_config):
-    #     """Create a valid `user_config` with database. Auto use in all class methods.
+    """
+    Tests for DBSetters.
 
-    #     Manually creates the required application directories (normally handled by
-    #     LaunchdMeInit).  Sets the `user-dir` to a Pytest `tmp_path` object.
-    #     """
-    #     self.user_config = mock_user_config
-    #     self.mock_app_dir = self.user_config.user_dir / "launchd-me"
-    #     self.mock_app_dir.mkdir(parents=True, exist_ok=True)
+    Run using the `mock_environment` pytest fixture which provides a configured
+    database and application dirs in a `tmp_path` directory.
 
-    def test_DBSetters_init(self, temp_env):
-        dbs = PlistDbSetters(temp_env.user_config)
+    """
+
+    def test_DBSetters_init(self, mock_environment: ConfiguredEnvironmentObjects):
+        """Test the object initialises as expected."""
+        dbs = PlistDbSetters(mock_environment.user_config)
         assert dbs.user_config.user_name == "mock_user_name"
 
-    def test_add_newly_created_plist_file(self, mock_env):
-        insert_sql = """
-        INSERT INTO PlistFiles (
-            PlistFileName,
-            ScriptName,
-            CreatedDate,
-            ScheduleType,
-            ScheduleValue,
-            CurrentState,
-            Description
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?);
+    def test_add_newly_created_plist_file(
+        self, mock_environment: ConfiguredEnvironmentObjects
+    ):
         """
-        connection = sqlite3.connect(mock_env.us)
+        Calls the method to add a plist file with the passed mock data.
+
+        Creates an independent sqlite3 connection and asserts that the database now
+        contains the passed mock data.
+
+        The value at index 3 is `created_time` which is ignored in the assert
+        statements.
+        """
+        expected = [
+            (
+                1,
+                "a plist_filename",
+                "a script_name",
+                "IGNORE ME AS TIME WILL ALWAYS BE CURRENT TIME",
+                "a schedule_type",
+                "a schedule_value",
+                "inactive",
+                "a description",
+            )
+        ]
+
+        dbs = PlistDbSetters(mock_environment.user_config)
+        dbs.add_newly_created_plist_file(
+            "a plist_filename",
+            "a script_name",
+            "a schedule_type",
+            "a schedule_value",
+            "a description",
+        )
+        connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM PlistFiles")
+        actual = cursor.fetchall()
+        assert actual[0][0:3] == expected[0][0:3]
+        assert actual[0][4:7] == expected[0][4:7]
 
     def test_add_installed_installation_status(self):
         pass
