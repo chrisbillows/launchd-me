@@ -426,7 +426,7 @@ class TestPlistCreator:
 
     def test_create_schedule_block(self, plc_interval):
         expected = "<key>StartInterval</key>\n\t<integer>300</integer>"
-        actual = plc_interval._create_interval_schedule_block()
+        actual = plc_interval._create_schedule_block()
         assert actual == expected
 
     def test_create_calendar_schedule_block(self, plc_calendar):
