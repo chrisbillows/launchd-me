@@ -9,7 +9,8 @@ theme:
   palette:
     # Palette toggle for light mode
     - scheme: default
-      primary: indigo
+      primary: white
+      accent: orange
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
@@ -26,11 +27,16 @@ theme:
     - navigation.tabs.sticky
     - toc.integrate
     - toc.follow
+    - content.tooltips
+    - content.code.copy
 
 markdown_extensions:
   - pymdownx.caret
   - pymdownx.mark
   - pymdownx.tilde
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
 
 plugins:
 - search
@@ -41,7 +47,9 @@ plugins:
             docstring_style: "numpy"  # Set the docstring style to NumPy
 
 nav:
-  - Launchd Me: index.md
-  - Features: about.md
+  - Launchd Me: home.md
+  - What is launchd: what_is_launchd.md
   - User Guide: user_guide.md
-  - API: API.md
+  - Maintainer: maintainer.md
+  - FAQs: faqs.md
+  - API: api.md
