@@ -182,68 +182,52 @@ class LaunchdMeUninstaller:
         pass
 
 
+class InvalidScheduleType(Exception):
+    pass
+
+
 class PlistCreator:
-    """Create launchd plist files for scheduling Python scripts.
+    """
+    Generate a launchd plist files to schedule a script.
+
+    This class handles the creation of plist files for automating scripts on macOS
+    using the launchd system, optionally making the script to be automated executable and automatically
+    installing the plist file.
+
+    The content of a plist file is stored in user's LaunchdMe database, along with
+    installation status and content.
+
+    Parameters
+    ----------
+    path_to_script_to_automate : Path
+        The path to the script to be automated by the plist.
+    schedule_type : str
+        Specifies the scheduling type: `"interval"` for time intervals or
+        `"calendar"` for calendar dates/times.
+    schedule : Union[int, Dict[str, int]]
+        The scheduling interval in seconds if `schedule_type` is "interval", or a
+        dictionary representing specific times if `schedule_type` is "calendar".
+    description : str
+        The user's description of what the script/plist file is automating.
+    make_executable : bool
+        Whether to make the script executable if it is not already.
+    auto_install : bool
+        Whether to automatically install the plist file upon creation.
+    user_config : UserConfig
+        Configuration for user-specific settings including the application directories
+        and the database file.
 
     Attributes
     ----------
-    script_name : str
-        Python script to be scheduled. E.g. ``"my_script.py"``.
-    schedule_type : ScheduleType
-        Either ``"ScheduleType.interval"`` for time-based intervals or
-        ``"ScheduleType.calendar"`` for specific dates/times.
-    schedule : int or dict
-        The required schedule. An integer of seconds for ``ScheduleType.interval``, a
-        dict of ``"period": "duration"`` for `ScheduleType calendar` e.g.
-        `"{'Hour': 15, 'Minute': 15}"`. Only a single date/time supported.
+    db_setter : PlistDBSetters
+        Interface to update the database when plist creation occurs.
 
     Methods
     -------
-    generate_plist_file():
-        Generates the plist file.
-    _validate_calendar_schedule():
-        Validates a the periods and durations in a calendar schedule.
-    _create_schedule_block():
-        Creates the scheduling block based on the schedule type and schedule.
-    _create_calendar_schedule_block():
-        An additional method require to generate more complex calendar schedule blocks.
-
-    Examples
-    --------
-    >>> plc = PlistCreator('interval_task.py', 'interval', 300)
-    >>> plc.generate_plist_file()
-
-    >>> plc = PlistCreator('daily_task.py', 'calendar', "{'Hour': 9, 'Minute': 0}")
-    >>> plc.generate_plist_file()
-
-    Example - Calendar Schedules
-    ----------------------------
-    Every day at 3:15 PM.
-    >>> {'Hour': 15, 'Minute': 15}
-
-    Every Monday at 8:00 AM. Weekday is specified with a range from 0 to 6, where 0 is
-    Sunday and 6 is Saturday.
-    >>> {'Weekday': 1, 'Hour': 8, 'Minute': 0}
-
-    The 1st day of every month at midnight.
-    >>> {'Day': 1, 'Hour': 0, 'Minute': 0}
-
-    #### ----NOT SUPPORTED----
-    Every 15 minutes during office hours (9 AM to 5 PM) on weekdays. An example
-    illustrating the use of arrays for multiple values.
-    >>> {
-        'Hour': [9, 10, 11, 12, 13, 14, 15, 16],
-        'Minute': [0, 15, 30, 45],
-        'Weekday': [1, 2, 3, 4, 5]
-        }
-
-    On the 15th of June and December at 1:30 PM. Uses an array of dictionaries to
-    specify multiple dates.
-    >>> [
-        {'Month': 6, 'Day': 15, 'Hour': 13, 'Minute': 30},
-        {'Month': 12, 'Day': 15, 'Hour': 13, 'Minute': 30}
-        ]
-
+    driver()
+        Runs all the functionality of the class. This is the public method to call, for
+        interval or calendar scheduling, to create plist files and manage them in a
+        user's LaunchdMe database.
     """
 
     def __init__(
@@ -254,44 +238,62 @@ class PlistCreator:
         description: str,
         make_executable: bool,
         auto_install: bool,
-    ):
+        user_config: UserConfig,
+    ) -> None:
         """
+        Initialise a new PlistCreator instance.
+
+        Parameters
+        ----------
+        path_to_script_to_automate : Path
+            The path to the script to be automated by the plist.
+        schedule_type : ScheduleType
+            The type of schedule for the plist (interval or calendar).
+        schedule : Union[int, Dict[str, int]]
+            Interval in seconds or dictionary for calendar scheduling.
+        description : str
+            Description of the plist's purpose.
+        make_executable : bool
+            If True, makes the script executable.
+        auto_install : bool
+            If True, automatically installs the plist after creation.
+        user_config : UserConfig
+            Configuration for user-specific settings like directories and database paths.
+
         Attributes
         ----------
-        path_to_script_to_automate : str
-            A verfied, resolved pathlib Path object to a file.
-        script_to_automate_name
-
-        schedule_type : str
-            Specifies the scheduling type: `"interval"` for time intervals or
-            `"calendar"` for calendar dates/times.
-        schedule : str or int
-            The scheduling interval in seconds if `schedule_type` is "interval", or a
-            string formatted dictionary representing duration(s) and duration value(s)
-            if `schedule_type` is "calendar".
-
+        db_setter : PlistDBSetters
+            Interface to update the database when plist creation occurs.
         """
-        self.path_to_script_to_automate: Path = path_to_script_to_automate
-        self.script_to_automate_name: str = self.path_to_script_to_automate.name
+
+        self.path_to_script_to_automate = path_to_script_to_automate
         self.schedule_type = schedule_type
         self.schedule = schedule
-        self.description: str = description
-        self.make_executable: bool = make_executable
-        self.auto_install: bool = auto_install
-        self._user_config: UserConfig = UserConfig()
-        self.template_path = self._user_config.plist_template_path
-        self.project_dir = self._user_config.project_dir
-        self.plist_db_setter: PlistDbSetters = PlistDbSetters()
+        self.description = description
+        self.make_executable = make_executable
+        self.auto_install = auto_install
+        self.user_config = user_config
+        self.db_setter = PlistDbSetters(self.user_config)
 
     def driver(self, plist_dir=None) -> Path:
-        """Driver function."""
+        """
+        Driver method for all PlistCreator functionality.
+
+        Returns
+        -------
+        Path
+            A Path to the newly created plist file. The plist file is tracked in the
+            user's LaunchdMe database and, optionally, the script the plist automates
+            is made executable and the plist file itself is installed to run.
+        """
         if self.schedule_type == "calendar":
             self._validate_calendar_schedule(self.schedule)
         plist_filename = self._generate_file_name()
-        plist_content = self._create_plist_content(plist_filename)
-        plist_file_path = Path(self._user_config.plist_dir / plist_filename)
+        schedule_block = self._create_schedule_block()
+        plist_content = self._create_plist_content(plist_filename, schedule_block)
+        plist_file_path = Path(self.user_config.plist_dir / plist_filename)
         self._write_file(plist_file_path, plist_content)
-        plist_id = self.plist_db_setter.add_newly_created_plist_file(
+        plist_id = self.db_setter.add_newly_created_plist_file(
             plist_filename,
             self.path_to_script_to_automate.name,
             self.schedule_type,
@@ -301,47 +303,61 @@ class PlistCreator:
         if self.make_executable:
             self._make_script_executable()
         if self.auto_install:
-            db_setter = PlistDbSetters()
-            plist_installer = PlistInstallationManager(self._user_config, db_setter)
+            plist_installer = PlistInstallationManager(self.user_config, self.db_setter)
             plist_installer.install_plist(plist_id, plist_file_path)
         return plist_file_path
 
-    def _generate_file_name(self):
-        with PListDbConnectionManager(self._user_config) as cursor:
+    def _generate_file_name(self) -> str:
+        """
+        Generates the file name for the plist file.
+
+        Important as this is installed in LaunchAgents and needs to be recognisable. The
+        filename uses the `local` prefix for easy identification within macOS.
+
+        It attempts to ensure uniqueness by using the next index in the Launchd Me
+        database. Plist entries are never deleted, only marked "deleted" so this number
+        will be accurate in normal usage (assuming the user doesn't mirror the Launchd
+        Me naming conventions).
+
+        Returns
+        -------
+        str
+            The plist filename.
+        """
+
+        with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute("SELECT COUNT(*) FROM PlistFiles")
             row_count = cursor.fetchone()[0]
         plist_id = row_count + 1
-        plist_file_name = f"local.{self._user_config.user_name}.{self.path_to_script_to_automate.name.split('.')[0]}_{plist_id:04}.plist"
+        plist_file_name = f"local.{self.user_config.user_name}.{self.path_to_script_to_automate.name.split('.')[0]}_{plist_id:04}.plist"
         logger.debug("Generated plist file name.")
         return plist_file_name
 
-    def _write_file(self, plist_path: Path, plist_content: str):
-        """Write content to a file path."""
+    def _write_file(self, plist_path: Path, plist_content: str) -> None:
+        """
+        Write content to a file path.
+        """
         with open(str(plist_path), "w") as file_handle:
             file_handle.write(plist_content)
         logger.info(f"Plist file created at {plist_path}")
 
-    def _make_script_executable(self):
+    def _make_script_executable(self) -> None:
         """
-        Makes the specified script executable by changing its permissions.
+        Makes the script to be automated executable by changing its permissions.
 
-        Parameters
-        ----------
-        script_path : str
-            The path to the script file to make executable.
-
-        Examples
-        --------
-        >>> make_script_executable('/path/to/my_script.py')
-        This will change the permissions of 'my_script.py' to make it executable.
+        Raises
+        ------
+        CalledProcessError
+            If the subprocess call returns a non-zero (error) status.
         """
         logger.info(f"Ensure {self.path_to_script_to_automate} is executable.")
         subprocess.run(["chmod", "+x", self.path_to_script_to_automate], check=True)
 
     def _validate_calendar_schedule(self, calendar_schedule: dict) -> None:
-        """Validate a calendar schedule dictionary.
+        """
+        Validate a calendar schedule dictionary.
 
-        For more info see: https://www.launchd.info - "Configruation" -
+        For more info see: https://www.launchd.info. Select "Configuration" -
         "Starting a job at a specific time/date: StartCalendarInterval"
         """
         VALID_DURATIONS = {
@@ -351,29 +367,28 @@ class PlistCreator:
             "Minute": range(0, 60),  # 0-59
             "Weekday": range(0, 7),  # 0-6 (0 is Sunday)
         }
-
         for period, duration in calendar_schedule.items():
             if period not in VALID_DURATIONS.keys():
                 raise Exception(f"{period} is not a valid launchctl period.")
             if duration not in VALID_DURATIONS[period]:
                 raise Exception(f"A duration of {duration} is not valid for {period}.")
 
-    def _create_interval_schedule_block(self):
-        """Generates the schedule block.
+    def _create_schedule_block(self) -> str:
+        """
+        Generates the schedule block for the plist file.
 
-        Generates the scheduling block for the plist file based on `schedule_type` and
-        `schedule_value`.
+        Contains logic to create both interval and calendar schedule blocks.
 
         Returns
         -------
         str
-            The XML string for the scheduling part of the plist file.
+            The XML string for the scheduling block of the plist file.
 
         Raises
         ------
         ValueError
-            If `schedule_type` is not one of the expected values ('interval' or 'calendar').
-
+            If `schedule_type` is not one of the expected values ('interval' or
+            'calendar').
         """
         if self.schedule_type == "interval":
             schedule_block = (
@@ -385,28 +400,19 @@ class PlistCreator:
             schedule_block = self._create_calendar_schedule_block()
             return schedule_block
         else:
-            raise ValueError("Invalid schedule type. Choose 'interval' or 'calendar'.")
+            raise ValueError("Invalid schedule type.")
 
-    def _create_calendar_schedule_block(self):
-        """Generates the schedule block for the calendar schedule type.
+    def _create_calendar_schedule_block(self) -> str:
+        """
+        Generates the schedule block for the calendar schedule type.
 
-        Takes a duration dictionary  and returns a valid
-        XML block as a string (including tabs and new lines).
+        Takes a duration dictionary and returns a valid XML block as a string (including
+        tabs and new lines).
 
         Returns
         -------
         str
-            The XML string for the scheduling part of the plist file.
-
-        Example:
-        >>> "{'Hour': 9, 'Minute': 30}"
-        <dict>
-            <key>Hour</key>
-            <integer>9</integer>
-            <key>Minute</key>
-            <integer>30</integer>
-        </dict>
-
+            The XML string for the scheduling block of the plist file.
         """
         block_middle = ""
         for period, duration in self.schedule.items():
@@ -418,22 +424,19 @@ class PlistCreator:
         )
         return calendar_block
 
-    def _create_plist_content(self, plist_filename):
-        """Updates plist template with required script and schedule details.
+    def _create_plist_content(self, plist_filename, schedule_block) -> str:
+        """Create plist body content.
 
-        The new plist file is named after the script (without its extension) with a
-        '.plist' extension.
+        Replaces the plist template  `{{PLACEHOLDERS}}` with required details.
 
-        Examples
-        --------
-        >>> creator = PlistCreator('my_script.py', 'interval', 3600)
-        >>> creator.create_plist()
-        Plist file created at <project_dir>/plist_files/local.cbillows.my_script.plist
-
+        Returns
+        -------
+        str
+            The full content of the plist file based on the parameters passed with the
+            `PlistCreator` was instantiated.
         """
-        with open(self.template_path, "r") as file:
+        with open(self.user_config.plist_template_path, "r") as file:
             content = file.read()
-        schedule_block = self._create_interval_schedule_block()
         content = content.replace("{{SCHEDULE_BLOCK}}", schedule_block)
         content = content.replace("{{NAME_OF_PLIST_FILE}}", plist_filename)
         content = content.replace(
@@ -445,16 +448,18 @@ class PlistCreator:
         )
         # For log files.
         content = content.replace(
-            "{{ABSOLUTE_PATH_TO_PROJECT_DIRECTORY}}", str(self.project_dir)
+            "{{ABSOLUTE_PATH_TO_PROJECT_DIRECTORY}}", str(self.user_config.project_dir)
         )
         logger.debug("Generated plist file content.")
         return content
 
 
 class PlistDbSetters:
-    @staticmethod
+    def __init__(self, user_config: UserConfig) -> None:
+        self.user_config = user_config
+
     def add_newly_created_plist_file(
-        plist_filename, script_name, schedule_type, schedule_value, description
+        self, plist_filename, script_name, schedule_type, schedule_value, description
     ):
         now = datetime.now().isoformat()
         insert_sql = """
@@ -470,7 +475,7 @@ class PlistDbSetters:
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """
         logger.debug("Adding new plist file to database.")
-        with PListDbConnectionManager(UserConfig()) as cursor:
+        with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 insert_sql,
                 (
@@ -485,23 +490,22 @@ class PlistDbSetters:
             )
         return cursor.lastrowid
 
-    @staticmethod
-    def add_installed_installation_status(file_id):
-        with PListDbConnectionManager(UserConfig()) as cursor:
+    def add_installed_installation_status(self, file_id):
+        with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 "UPDATE PlistFiles SET CurrentState = 'running' WHERE PlistFileID = ?",
                 (file_id,),
             )
 
     def add_uninstalled_installation_status(self, file_id):
-        with PListDbConnectionManager(UserConfig()) as cursor:
+        with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 "UPDATE PlistFiles SET CurrentState = 'inactive' WHERE PlistFileID = ?",
                 (file_id,),
             )
         logger.debug(f"Plist {file_id} now has 'inactive' status.")
 
-    def add_deleted_installation_status():
+    def add_deleted_installation_status(self):
         pass
 
 

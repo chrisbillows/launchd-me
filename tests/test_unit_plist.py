@@ -12,8 +12,10 @@ This serves the same pass as an `__init__` method. An autouse fixture is used as
 allows Pytest to carry out automatic setup and teardown.
 """
 
+import os
+import re
 import subprocess
-from dataclasses import dataclass
+import sys
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from unittest.mock import MagicMock, Mock, patch
@@ -21,24 +23,27 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from launchd_me.plist import (
     LaunchdMeInit,
+    PlistCreator,
     PListDbConnectionManager,
     PlistInstallationManager,
+    ScheduleType,
     UserConfig,
 )
 
 
 @pytest.fixture
-def mock_user_config(tmp_path):
+def mock_user_config(tmp_path) -> UserConfig:
     """Create a valid UserConfig for testing.
 
     Uses a `tmp path` for the user's root directory.
     """
     mock_user_dir = tmp_path
     mock_user_config = UserConfig(mock_user_dir)
+    mock_user_config.user_name = "mock_user_name"
     return mock_user_config
 
 
-class TestAllProjectObjectsInitialiseAsExpected:
+class TestUserConfig:
     """Basic tests that ensure all objects initialise as future tests expect.
 
     Newly added classes should be added here.
@@ -288,3 +293,167 @@ class TestPlistInstallationManager:
         """Assert an generic non-zero CLI call raises an error."""
         with pytest.raises(subprocess.CalledProcessError):
             self.plim._run_command_line_tool("grep", "hello", self.mock_plist)
+
+
+@pytest.fixture
+def plc_interval(mock_user_config) -> PlistCreator:
+    mock_script = Path("interval_task.py")
+    plc = PlistCreator(
+        mock_script,
+        ScheduleType.interval,
+        300,
+        "A description",
+        True,
+        True,
+        mock_user_config,
+    )
+    return plc
+
+
+@pytest.fixture
+def plc_calendar(mock_user_config) -> PlistCreator:
+    mock_script = Path("calendar_task.py")
+    plc = PlistCreator(
+        mock_script,
+        ScheduleType.calendar,
+        {"Day": 15, "Hour": 15},
+        "A description",
+        True,
+        True,
+        mock_user_config,
+    )
+    return plc
+
+
+class TestPlistCreator:
+    def test_plist_creator_initialisation_with_interval_schedule(self, plc_interval):
+        assert plc_interval.path_to_script_to_automate == Path("interval_task.py")
+        assert plc_interval.schedule_type == ScheduleType.interval
+        assert plc_interval.schedule == 300
+        assert plc_interval.description == "A description"
+        assert plc_interval.make_executable == True
+        assert plc_interval.auto_install == True
+
+    def test_plist_creator_initialisation_with_calendar_schedule(self, plc_calendar):
+        assert plc_calendar.path_to_script_to_automate == Path("calendar_task.py")
+        assert plc_calendar.schedule_type == ScheduleType.calendar
+        assert plc_calendar.schedule == {"Day": 15, "Hour": 15}
+        assert plc_calendar.description == "A description"
+        assert plc_calendar.make_executable == True
+        assert plc_calendar.auto_install == True
+
+    def test_generate_file_name(self, plc_interval):
+        """Test file name generation.
+
+        Attributes
+        ----------
+        plc_interval: PlistCreator
+            A fixture providing an instantiated PlistCreator instance. The instance
+            uses a fixture providing a UserConfig instance where the `user_dir` is
+            a tmp_path and the attribute user_name has been manually overwritten as
+            `mock_user_name`
+        """
+        ldm_init = LaunchdMeInit(plc_interval.user_config)
+        ldm_init.initialise_launchd_me()
+        actual = plc_interval._generate_file_name()
+        expected = "local.mock_user_name.interval_task_0001.plist"
+        assert actual == expected
+
+    def test_write_file_and_make_script_executable(self, plc_interval, tmp_path):
+        """Test writing mock content to a mock file.
+
+        Creates an empty mock file, writes content to it then makes it an exectuable.
+        """
+        mock_file = tmp_path / "mock_file"
+        mock_content = "123\n456\n789"
+        plc_interval._write_file(mock_file, mock_content)
+        plc_interval.path_to_script_to_automate = mock_file
+        plc_interval._make_script_executable()
+        assert mock_file.exists()
+        assert mock_file.read_text() == mock_content
+        assert os.access(mock_file, os.X_OK)
+
+    @pytest.mark.parametrize(
+        "calendar_schedule",
+        [
+            {"Month": 12},
+            {"Day": 31},
+            {"Hour": 22},
+            {"Minute": 55},
+            {"Weekday": 0},
+            {"Day": 15, "Hour": 15},
+            {"Month": 12, "Day": 31, "Hour": 22, "Minute": 55},
+        ],
+    )
+    def test_validate_calendar_schedule_with_valid_keys_values(
+        self, plc_calendar, calendar_schedule
+    ):
+        expected = None
+        actual = plc_calendar._validate_calendar_schedule(calendar_schedule)
+        assert actual == expected
+
+    @pytest.mark.parametrize(
+        "calendar_schedule",
+        [
+            {"": 1},
+            {"Invalid": 1},
+            {"HOUR": 1},
+            {"month": 1},
+            {"wEEkdAy": 1},
+        ],
+    )
+    def test_validate_calendar_schedule_with_invalid_keys(
+        self, plc_calendar, calendar_schedule
+    ):
+        with pytest.raises(Exception):
+            plc_calendar._validate_calendar_schedule(calendar_schedule)
+
+    @pytest.mark.parametrize(
+        "calendar_schedule",
+        [
+            {"Month": 15},
+            {"Day": 0},
+            {"Hour": 25},
+            {"Minute": -2},
+            {"Weekday": 8},
+        ],
+    )
+    def test_validate_calendar_schedule_with_invalid_values(
+        self, plc_calendar, calendar_schedule
+    ):
+        with pytest.raises(Exception):
+            plc_calendar._validate_calendar_schedule(calendar_schedule)
+
+    def test_create_schedule_block(self, plc_interval):
+        expected = "<key>StartInterval</key>\n\t<integer>300</integer>"
+        actual = plc_interval._create_schedule_block()
+        assert actual == expected
+
+    def test_create_calendar_schedule_block(self, plc_calendar):
+        expected = (
+            "<key>StartCalendarInterval</key>"
+            "\n\t<dict>"
+            "\n\t\t<key>Day</key>\n\t\t<integer>15</integer>"
+            "\n\t\t<key>Hour</key>\n\t\t<integer>15</integer>"
+            "\n\t</dict>"
+        )
+        actual = plc_calendar._create_calendar_schedule_block()
+        assert actual == expected
+
+    def test_create_plist_content(self, plc_interval):
+        mock_schedule_block = "<key>StartInterval</key>\n\t<integer>1000</integer>"
+        content = plc_interval._create_plist_content(
+            "file_to_schedule", mock_schedule_block
+        )
+        content_lines = content.split("\n")
+        line_idx_5 = "        <string>file_to_schedule</string>"
+        line_idx_9 = "                <string>interval_task.py</string>"
+        line_idx_18_ends = "launchd-me/logs/file_to_schedule_err.log</string>"
+        assert content_lines[5] == line_idx_5
+        assert content_lines[9] == line_idx_9
+        assert content_lines[18].endswith(line_idx_18_ends)
+        if sys.platform == "darwin":
+            plist_file = plc_interval.user_config.plist_dir / "test.plist"
+            plist_file.parent.mkdir(parents=True)
+            plist_file.write_text(content)
+            assert subprocess.run(["plutil", "-lint", str(plist_file)])
