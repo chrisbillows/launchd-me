@@ -505,9 +505,6 @@ class PlistDbSetters:
             )
         logger.debug(f"Plist {file_id} now has 'inactive' status.")
 
-    def add_deleted_installation_status(self):
-        pass
-
 
 class PlistInstallationManager:
     """Install and un-install plist files"""
