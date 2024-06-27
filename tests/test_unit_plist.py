@@ -457,3 +457,7 @@ class TestPlistCreator:
             plist_file.parent.mkdir(parents=True)
             plist_file.write_text(content)
             assert subprocess.run(["plutil", "-lint", str(plist_file)])
+
+
+class TestDBSetters:
+    pass
