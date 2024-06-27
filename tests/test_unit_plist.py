@@ -14,6 +14,7 @@ allows Pytest to carry out automatic setup and teardown.
 
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -25,10 +26,13 @@ from launchd_me.plist import (
     LaunchdMeInit,
     PlistCreator,
     PListDbConnectionManager,
+    PlistDbSetters,
     PlistInstallationManager,
     ScheduleType,
     UserConfig,
 )
+
+from tests.conftest import mock_environment
 
 
 @pytest.fixture
@@ -460,4 +464,38 @@ class TestPlistCreator:
 
 
 class TestDBSetters:
-    pass
+    # @pytest.fixture(autouse=True)
+    # def setup_temp_env(self, tmp_path, mock_user_config):
+    #     """Create a valid `user_config` with database. Auto use in all class methods.
+
+    #     Manually creates the required application directories (normally handled by
+    #     LaunchdMeInit).  Sets the `user-dir` to a Pytest `tmp_path` object.
+    #     """
+    #     self.user_config = mock_user_config
+    #     self.mock_app_dir = self.user_config.user_dir / "launchd-me"
+    #     self.mock_app_dir.mkdir(parents=True, exist_ok=True)
+
+    def test_DBSetters_init(self, temp_env):
+        dbs = PlistDbSetters(temp_env.user_config)
+        assert dbs.user_config.user_name == "mock_user_name"
+
+    def test_add_newly_created_plist_file(self, mock_env):
+        insert_sql = """
+        INSERT INTO PlistFiles (
+            PlistFileName,
+            ScriptName,
+            CreatedDate,
+            ScheduleType,
+            ScheduleValue,
+            CurrentState,
+            Description
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?);
+        """
+        connection = sqlite3.connect(mock_env.us)
+
+    def test_add_installed_installation_status(self):
+        pass
+
+    def test_add_uninstalled_installation_status(self):
+        pass
