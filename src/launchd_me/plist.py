@@ -466,7 +466,7 @@ class PlistDbSetters:
         logger.debug("Adding new plist file to database.")
         with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
-                INSERT_INTO_PLISTFILES_TABLE,
+                PLISTFILES_TABLE_INSERT_INTO,
                 (
                     plist_filename,
                     script_name,
@@ -479,14 +479,14 @@ class PlistDbSetters:
             )
         return cursor.lastrowid
 
-    def add_installed_installation_status(self, file_id):
+    def add_running_installation_status(self, file_id):
         with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 "UPDATE PlistFiles SET CurrentState = 'running' WHERE PlistFileID = ?",
                 (file_id,),
             )
 
-    def add_uninstalled_installation_status(self, file_id):
+    def add_inactive_installation_status(self, file_id):
         with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
                 "UPDATE PlistFiles SET CurrentState = 'inactive' WHERE PlistFileID = ?",
@@ -512,7 +512,7 @@ class PlistInstallationManager:
         self._run_command_line_tool("launchctl", "load", symlink_to_plist)
         logger.debug("Plist file now active.")
         logger.debug("Updating Plist file installation status.")
-        self.plist_db_setters.add_installed_installation_status(plist_id)
+        self.plist_db_setters.add_running_installation_status(plist_id)
         logger.debug("Database updated.")
 
     def uninstall_plist(self, plist_id: int, symlink_to_plist: Path):
@@ -521,7 +521,7 @@ class PlistInstallationManager:
         logger.debug("Removing symlink")
         symlink_to_plist.unlink()
         logger.debug("Updating database.")
-        self.plist_db_setters.add_uninstalled_installation_status(plist_id)
+        self.plist_db_setters.add_inactive_installation_status(plist_id)
         logger.info(f"Plist file {plist_id} successfully uninstalled.")
 
     def _create_symlink_in_launch_agents_dir(self, plist_file_path: Path):
