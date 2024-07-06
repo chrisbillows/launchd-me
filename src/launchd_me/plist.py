@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.table import Row, Table
 
 from launchd_me.logger_config import logger
-from launchd_me.sql_commands import INSERT_INTO_PLISTFILES_TABLE
+from launchd_me.sql_statements import PLISTFILES_TABLE_INSERT_INTO
 
 
 class ScheduleType(str, Enum):
