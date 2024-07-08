@@ -14,6 +14,7 @@ allows Pytest to carry out automatic setup and teardown.
 
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -25,10 +26,19 @@ from launchd_me.plist import (
     LaunchdMeInit,
     PlistCreator,
     PListDbConnectionManager,
-    PlistDbGetters,
+    PlistDbSetters,
     PlistInstallationManager,
     ScheduleType,
     UserConfig,
+)
+from launchd_me.sql_statements import (
+    PLISTFILES_TABLE_INSERT_INTO,
+    PLISTFILES_TABLE_SELECT_ALL,
+)
+
+from tests.conftest import (
+    ConfiguredEnvironmentObjects,
+    add_three_plist_file_entries_to_a_plist_files_table,
 )
 
 
@@ -458,6 +468,121 @@ class TestPlistCreator:
             plist_file.parent.mkdir(parents=True)
             plist_file.write_text(content)
             assert subprocess.run(["plutil", "-lint", str(plist_file)])
+
+
+class TestDBSetters:
+    """
+    Tests for DBSetters.
+
+    The tests in this class are run using the `mock_environment` Pytest fixture which
+    provides a configured, empty database and application directories in a `tmp_path`
+    directory.
+
+    """
+
+    def test_DBSetters_init(self, mock_environment: ConfiguredEnvironmentObjects):
+        """Test the object initialises as expected."""
+        dbs = PlistDbSetters(mock_environment.user_config)
+        assert dbs.user_config.user_name == "mock_user_name"
+
+    def test_add_newly_created_plist_file(
+        self, mock_environment: ConfiguredEnvironmentObjects
+    ):
+        """Test adding a Plist file record to the PlistFiles database table.
+
+        The test calls `add_newly_created_plist_file`, with placeholder data, to add a
+        plist file entry to the empty database in the mock environment.
+
+        The test creates an independent sqlite3 connection to the database and asserts
+        that the database now contains the passed placeholder data.
+
+        The value at index 3 is `created_time` which is ignored in the assert
+        statements.
+        """
+        dbs = PlistDbSetters(mock_environment.user_config)
+        dbs.add_newly_created_plist_file(
+            "a plist_filename",
+            "a script_name",
+            "a schedule_type",
+            "a schedule_value",
+            "a description",
+        )
+        connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute(PLISTFILES_TABLE_SELECT_ALL)
+        actual = cursor.fetchall()
+        connection.close()
+        expected = [
+            (
+                1,
+                "a plist_filename",
+                "a script_name",
+                "IGNORE ME AS TIME WILL ALWAYS BE THE CURRENT TIME",
+                "a schedule_type",
+                "a schedule_value",
+                "inactive",
+                "a description",
+            )
+        ]
+        assert actual[0][0:3] == expected[0][0:3]
+        assert actual[0][4:7] == expected[0][4:7]
+
+    def test_add_running_installation_status(
+        self, mock_environment: ConfiguredEnvironmentObjects
+    ):
+        """Test changing a plist record's installation status to "running".
+
+        The test calls a helper function to add synthetic plist data to the empty
+        database created in the mock environment. The test retrieves the CurrentState
+        column value for PlistFileID 3 and asserts it is 'inactive'.
+
+        The test then calls the `add_running_installation_status` method on PlistFileID
+        3. The test asserts that this record has been correctly changed in the
+        database.
+
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            mock_environment.user_config.ldm_db_file
+        )
+        connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute("SELECT CurrentState FROM PlistFiles WHERE PlistFileID=3;")
+        initial_status = cursor.fetchall()
+        assert initial_status == [("inactive",)]
+
+        dbs = PlistDbSetters(mock_environment.user_config)
+        dbs.add_running_installation_status(3)
+        cursor.execute("SELECT CurrentState FROM PlistFiles WHERE PlistFileID=3;")
+        updated_status = cursor.fetchall()
+        assert updated_status == [("running",)]
+
+    def test_add_inactive_installation_status(
+        self, mock_environment: ConfiguredEnvironmentObjects
+    ):
+        """Test changing a plist record's installation status to "running".
+
+        The test calls a helper function to add synthetic plist data to the empty
+        database created in the mock environment. The test retrieves the CurrentState
+        column value for PlistFileID 1 and asserts it is 'running'.
+
+        The test then calls the `add_inactive_installation_status` method on PlistFileID
+        1. The test asserts that this record has been correctly changed in the
+        database.
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            mock_environment.user_config.ldm_db_file
+        )
+        connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute("SELECT CurrentState FROM PlistFiles WHERE PlistFileID=1;")
+        initial_status = cursor.fetchall()
+        assert initial_status == [("running",)]
+
+        dbs = PlistDbSetters(mock_environment.user_config)
+        dbs.add_inactive_installation_status(3)
+        cursor.execute("SELECT CurrentState FROM PlistFiles WHERE PlistFileID=3;")
+        updated_status = cursor.fetchall()
+        assert updated_status == [("inactive",)]
 
 
 class TestDbGetters:

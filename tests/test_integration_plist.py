@@ -1,70 +1,20 @@
 import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from launchd_me.plist import (
-    LaunchdMeInit,
     PlistCreator,
     PListDbConnectionManager,
     ScheduleType,
-    UserConfig,
 )
 
-
-@dataclass
-class ConfiguredEnvironmentObjects:
-    """An object for passing an initialised launchd-me configuration.
-
-    Allows tests to access all objects used to create the test environment.
-
-    Attributes
-    ----------
-    tmp_dir: Path
-        Use to pass a Pytest `tmp_path` object that can stand-in for a user's root dir.
-    user_config: UserConfig
-        A initialised UserConfiguaration object.
-    ldm_init: LaunchdMeInit
-        The object used to Initialise the LaunchdMe application structure.
-    """
-
-    temp_user_dir: Path
-    user_config: UserConfig
-    ldm_init: LaunchdMeInit
+from tests.conftest import ConfiguredEnvironmentObjects
 
 
-@pytest.fixture
-def temp_env(tmp_path) -> ConfiguredEnvironmentObjects:
-    """Provide a configured environment for testing.
-
-    Doubles as an integration test for `UserConfig` and `LaunchdMeInit`.
-
-    Creates a temporary environment with application directories and a db file using a
-    Pytest `tmp_path` as the user's home dir. Overwrites the loaded `user_name` with
-    `mock.user` for consistency.
-
-    This can be used to allow real reading and writing to a database during testing and
-    minimise the need for mocking.
-
-    Returns
-    -------
-    temp_test_env: ConfiguredEnvironmentObjects
-        A ConfiguredEnvironmentObjects object making all aspects of the configuration
-        accessible to any test.
-    """
-    temp_user_dir = tmp_path
-    user_config = UserConfig(temp_user_dir)
-    user_config.user_name = "mockuser"
-    ldm_init = LaunchdMeInit(user_config)
-    ldm_init.initialise_launchd_me()
-    temp_env = ConfiguredEnvironmentObjects(temp_user_dir, user_config, ldm_init)
-    return temp_env
-
-
-class TestTheTempEnvTestEnvironment:
+class TestTheMockEnvironmentFixture:
     """Validate all aspects of the test environment.
 
     Doubles as a validation of the integration test of `UserConfig` and `LaunchdMeInit`
@@ -74,22 +24,22 @@ class TestTheTempEnvTestEnvironment:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_temp_env(self, temp_env):
+    def setup_mock_environment(self, mock_environment):
         """Fixture to pass the temp env to all test class methods.
 
         DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
         teardown.
         """
-        self.temp_env = temp_env
+        self.mock_environment = mock_environment
 
-    def test_tmp_env_username(self):
+    def test_mock_environment_username(self):
         """Test the temp env has the configured user name."""
-        assert self.temp_env.user_config.user_name == "mockuser"
+        assert self.mock_environment.user_config.user_name == "mock_user_name"
 
-    def test_temp_env_paths_to_application_files_and_directories(self):
+    def test_mock_environment_paths_to_application_files_and_directories(self):
         """Test application directory and file paths are correct."""
-        user_config = self.temp_env.user_config
-        temp_user_dir = self.temp_env.temp_user_dir
+        user_config = self.mock_environment.user_config
+        temp_user_dir = self.mock_environment.temp_user_dir
         assert user_config.user_dir == temp_user_dir
         assert user_config.project_dir == temp_user_dir.joinpath(Path("launchd-me"))
         assert user_config.plist_dir == temp_user_dir.joinpath(
@@ -99,37 +49,37 @@ class TestTheTempEnvTestEnvironment:
             Path("launchd-me/launchd-me.db")
         )
 
-    def test_temp_env_application_files_and_directories_are_created(self):
+    def test_mock_environment_application_files_and_directories_are_created(self):
         """Test application directory and files are created.
 
         Could be combined with checking paths are correct but ensuring the test
         environment behaves as expected is worth the double check.
         """
-        user_config = self.temp_env.user_config
+        user_config = self.mock_environment.user_config
         assert user_config.user_dir.exists()
         assert user_config.project_dir.exists()
         assert user_config.plist_dir.exists()
         assert user_config.ldm_db_file.exists()
 
-    def test_temp_env_paths_to_system_directory_directories(self):
+    def test_mock_environment_paths_to_system_directory_directories(self):
         """Test required system directory paths are correct."""
-        user_config = self.temp_env.user_config
-        temp_user_dir = self.temp_env.tmp_dir
+        user_config = self.mock_environment.user_config
+        temp_user_dir = self.mock_environment.tmp_dir
         assert user_config.launch_agents_dir == temp_user_dir.joinpath(
             "Library/LaunchAgents"
         )
 
-    def test_temp_env_paths_to_system_directory_directories(self):
+    def test_mock_environment_paths_to_system_directory_directories(self):
         """Test required system directory paths exist as expected."""
-        user_config = self.temp_env.user_config
-        temp_user_dir = self.temp_env.temp_user_dir
+        user_config = self.mock_environment.user_config
+        temp_user_dir = self.mock_environment.temp_user_dir
         assert user_config.launch_agents_dir == temp_user_dir.joinpath(
             "Library/LaunchAgents"
         )
 
-    def test_temp_env_paths_to_package_data_files(self):
+    def test_mock_environment_paths_to_package_data_files(self):
         """Test non Python files exist."""
-        template_file = self.temp_env.user_config.plist_template_path
+        template_file = self.mock_environment.user_config.plist_template_path
         template_dir = template_file.parent
         launchd_me_install_dir = template_dir.parent
         print("The path to the template file should be", str(template_file))
@@ -146,15 +96,15 @@ class TestTheTempEnvTestEnvironment:
             template_file.exists()
         ), f"Template file does not exist at: {template_file}"
 
-    def test_temp_env_data_files_are_accessible(self):
+    def test_mock_environment_data_files_are_accessible(self):
         """Test non Python files are correctly created and therefore readable."""
-        template_file = self.temp_env.user_config.plist_template_path
+        template_file = self.mock_environment.user_config.plist_template_path
         with open(template_file, "r") as file_handle:
             content = file_handle.readlines()
         assert content[3] == "<dict>\n"
 
-    def test_database_created_by_launchd_me_init(self):
-        ldm_database = self.temp_env.user_config.ldm_db_file
+    def test_mock_environment_database_created_by_launchd_me_init(self):
+        ldm_database = self.mock_environment.user_config.ldm_db_file
         assert ldm_database.exists()
 
     def test_plist_db_connection_manager_created_and_of_the_correct_type(self):
@@ -163,7 +113,7 @@ class TestTheTempEnvTestEnvironment:
         Checks the ldm_db_file is valid and can be connected to, that the Connection
         and Cursor objects are created and of the correct type.
         """
-        user_config = self.temp_env.user_config
+        user_config = self.mock_environment.user_config
         with PListDbConnectionManager(user_config) as cursor:
             connection = cursor.connection
         assert isinstance(connection, Connection)
@@ -183,7 +133,9 @@ class TestPlistCreatorGeneratePlist:
     """
 
     @pytest.fixture(autouse=True)
-    def run_plist_creator_driver_in_the_temp_env_environment(self, temp_env):
+    def run_plist_creator_driver_in_the_mock_environment(
+        self, mock_environment: ConfiguredEnvironmentObjects
+    ):
         """Runs `PlistCreator.driver` and all class tests then `autouse` the results.
 
         Creates `mock_script` that the plist will automate. Makes a `LaunchAgents` dir
@@ -199,9 +151,11 @@ class TestPlistCreatorGeneratePlist:
         DO NOT use __init__ in test classes as it inhibits Pytests automatic setup and
         teardown.
         """
-        self.temp_env: ConfiguredEnvironmentObjects = temp_env
+        self.temp_env: ConfiguredEnvironmentObjects = mock_environment
         self.mock_run_command_line_tool: MagicMock = MagicMock()
-        self.mock_script: Path = temp_env.user_config.user_dir / "interval_task.py"
+        self.mock_script: Path = (
+            mock_environment.user_config.user_dir / "interval_task.py"
+        )
         self.plc: PlistCreator = None
         self.plist_file_path: Path = None
 
@@ -214,7 +168,7 @@ class TestPlistCreatorGeneratePlist:
             "A description",
             True,
             True,
-            temp_env.user_config,
+            mock_environment.user_config,
         )
         with patch(
             "launchd_me.plist.PlistInstallationManager._run_command_line_tool"
@@ -227,13 +181,15 @@ class TestPlistCreatorGeneratePlist:
 
     def test_plist_driver_created_plist_file_with_expected_name(self):
         """Assert the created file has the expected name."""
-        assert self.plist_file_path.name == "local.mockuser.interval_task_0001.plist"
+        assert (
+            self.plist_file_path.name == "local.mock_user_name.interval_task_0001.plist"
+        )
 
     @pytest.mark.parametrize(
         "line_index, expected_line_content",
         [
             (0, '<?xml version="1.0" encoding="UTF-8"?>'),
-            (5, "<string>local.mockuser.interval_task_0001.plist</string>"),
+            (5, "<string>local.mock_user_name.interval_task_0001.plist</string>"),
             (9, "<string>interval_task.py</string>"),
         ],
     )
@@ -250,11 +206,11 @@ class TestPlistCreatorGeneratePlist:
             (12, "</string>"),
             (
                 16,
-                "/launchd-me/logs/local.mockuser.interval_task_0001.plist_std_out.log</string>",
+                "/launchd-me/logs/local.mock_user_name.interval_task_0001.plist_std_out.log</string>",
             ),
             (
                 18,
-                "/launchd-me/logs/local.mockuser.interval_task_0001.plist_err.log</string>",
+                "/launchd-me/logs/local.mock_user_name.interval_task_0001.plist_err.log</string>",
             ),
         ],
     )
@@ -302,7 +258,7 @@ class TestPlistCreatorGeneratePlist:
         # Exclues [4] which is the plist creation timestamp.
         assert all_rows[0][0:3] == (
             1,
-            "local.mockuser.interval_task_0001.plist",
+            "local.mock_user_name.interval_task_0001.plist",
             "interval_task.py",
         )
         assert all_rows[0][4:7] == ("interval", "300", "running")
