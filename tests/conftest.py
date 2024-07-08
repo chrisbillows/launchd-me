@@ -39,7 +39,7 @@ def mock_environment(tmp_path) -> ConfiguredEnvironmentObjects:
 
     Creates a temporary environment with application directories and a db file using a
     Pytest `tmp_path` as the user's home dir. The database is empty and no plist files
-    exist in the application directories.Overwrites the loaded `user_name` with
+    exist in the application directories. Overwrites the loaded `user_name` with
     `mock.user` for consistency.
 
     This can be used to allow real reading and writing to a database during testing and

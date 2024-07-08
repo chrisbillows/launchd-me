@@ -569,7 +569,7 @@ class PlistDbGetters:
     def __init__(self, user_config: UserConfig):
         self._user_config = user_config
 
-    def verify_plist_id_valid(self, plist_id):
+    def verify_plist_id_valid(self, plist_id) -> None:
         """Checks if a plist ID is valid.
 
         Attributes

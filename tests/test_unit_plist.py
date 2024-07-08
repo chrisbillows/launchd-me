@@ -13,12 +13,10 @@ allows Pytest to carry out automatic setup and teardown.
 """
 
 import os
-import re
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
-from sqlite3 import Connection, Cursor
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -26,7 +24,9 @@ from launchd_me.plist import (
     LaunchdMeInit,
     PlistCreator,
     PListDbConnectionManager,
+    PlistDbGetters,
     PlistDbSetters,
+    PlistFileIDNotFound,
     PlistInstallationManager,
     ScheduleType,
     UserConfig,
@@ -105,7 +105,7 @@ class TestPlistDBConnectionManager:
         """Create a valid `user_config` with database. Auto use in all class methods.
 
         Manually creates the required application directories (normally handled by
-        LaunchdMeInit).  Sets the `user-dir` to a Pytest `tmp_path` object.
+        LaunchdMeInit). Sets the `user-dir` to a Pytest `tmp_path` object.
         """
         # self.mock = temp_env
         self.mock_user_dir = Path(tmp_path)
@@ -133,7 +133,7 @@ class TestPlistDBConnectionManager:
                     "type": <column_type>
                     }
         """
-        connection = Connection(self.user_config.ldm_db_file)
+        connection = sqlite3.Connection(self.user_config.ldm_db_file)
         cursor = connection.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
@@ -184,7 +184,7 @@ class TestPlistDBConnectionManager:
         expected = (1,)
         pldbcm = PListDbConnectionManager(self.user_config)
         cursor = pldbcm.__enter__()
-        assert isinstance(cursor, Cursor)
+        assert isinstance(cursor, sqlite3.Cursor)
         try:
             cursor.execute("SELECT 1")
             cursor = cursor.fetchone()
@@ -246,7 +246,7 @@ class TestPlistInstallationManager:
         self.mock_plist = self.mock_user_dir / self.mock_plist_filename
         self.mock_plist.touch()
 
-    def test_plist_installation_manager_insantiates_as_expected(self):
+    def test_plist_installation_manager_instantiates_as_expected(self):
         """Instantiate using expected arguments and with expected attributes."""
         assert self.plim.user_config is not None
         assert self.plim.plist_db_setters is not None
@@ -586,16 +586,37 @@ class TestDBSetters:
 
 
 class TestDbGetters:
-    # TODO: We can just create our own db and write some info to it, then check it is
-    # able to recover it correctly.
+    """Tests for DBGetters.
 
-    def test_init(self, mock_user_config):
-        # db_getter = PlistDbGetters(mock_user_config)
-        # assert db_getter._user_config.user_name == "mockuser"
-        pass
+    The tests in this class are provided with a populated db via the
+    ``provide_populated_db_for_all_tests_in_class`` autouse fixture.
 
-    def test_verify_list_id_valid(self):
-        pass
+    This autouse fixture instantiates a ``PlistDbGetters`` using the `mock_environment`
+    Pytest fixture which provides a configured, empty database and application
+    directories in a `tmp_path` directory.
+
+    The autouse fixture then calls
+    ``add_three_plist_file_entries_to_a_plist_files_table`` to add synthetic data to the
+    database.
+
+    """
+
+    @pytest.fixture(autouse=True)
+    def provide_populated_db_for_all_tests_in_class(self, mock_environment):
+        self.dbg = PlistDbGetters(mock_environment.user_config)
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+
+    def test_init(self):
+        assert self.dbg._user_config.user_name == "mock_user_name"
+
+    def test_verify_list_id_does_not_raise_for_a_valid_id(self):
+        assert self.dbg.verify_plist_id_valid(1) is None
+
+    def test_verify_list_raises_for_an_invalid_id(self):
+        with pytest.raises(PlistFileIDNotFound):
+            assert self.dbg.verify_plist_id_valid(4) is None
 
     def test_get_all_tracked_plist_files(self):
         pass
