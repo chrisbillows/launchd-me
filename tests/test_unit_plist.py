@@ -588,38 +588,167 @@ class TestDBSetters:
 class TestDbGetters:
     """Tests for DBGetters.
 
-    The tests in this class are provided with a populated db via the
-    ``provide_populated_db_for_all_tests_in_class`` autouse fixture.
+    The tests in this class are provided with a PlistDbGetters instance with an empty
+    database via ``self.dbg``. This is configured with the autouse fixture
+    ``provide_populated_db_for_all_tests_in_class``.
 
-    This autouse fixture instantiates a ``PlistDbGetters`` using the `mock_environment`
-    Pytest fixture which provides a configured, empty database and application
-    directories in a `tmp_path` directory.
+    This autouse fixture instantiates a ``PlistDbGetters`` using the
+    ``mock_environment`` Pytest fixture. The ``mock_environment` Pytest fixture provides
+    a configured, empty database and application directories in a `tmp_path` directory.
 
-    The autouse fixture then calls
+    Tests that require a populated database individually call
     ``add_three_plist_file_entries_to_a_plist_files_table`` to add synthetic data to the
     database.
-
     """
 
     @pytest.fixture(autouse=True)
-    def provide_populated_db_for_all_tests_in_class(self, mock_environment):
+    def provide_empty_db_for_all_tests_in_class(self, mock_environment):
+        """Fixture to instantiate a ``PlistDbGetters`` instance with an empty database
+        and automatically pass it to all tests in the class via ``self.dbg``.
+        """
         self.dbg = PlistDbGetters(mock_environment.user_config)
+
+    def test_init(self):
+        """Test ``PlistDbGetters`` initialises as expected, with an expected value."""
+        assert self.dbg._user_config.user_name == "mock_user_name"
+
+    def test_verify_a_plist_id_is_valid_does_not_raise_for_a_valid_id(self):
+        """Test ``verify_a_plist_id_is_valid`` doesn't raise on a valid PlistFileID for
+        a row of synthetic data.
+        """
         add_three_plist_file_entries_to_a_plist_files_table(
             self.dbg._user_config.ldm_db_file
         )
+        assert self.dbg.verify_a_plist_id_is_valid(1) is None
 
-    def test_init(self):
-        assert self.dbg._user_config.user_name == "mock_user_name"
-
-    def test_verify_list_id_does_not_raise_for_a_valid_id(self):
-        assert self.dbg.verify_plist_id_valid(1) is None
-
-    def test_verify_list_raises_for_an_invalid_id(self):
+    def test_verify_a_plist_id_is_valid_raises_for_an_invalid_id(self):
+        """Test ``verify_a_plist_id_is_valid`` raises for an invalid PlistFileID. The
+        test looks for a PlistFileID of `4` but the database only contains three
+        synthetic rows.
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
         with pytest.raises(PlistFileIDNotFound):
-            assert self.dbg.verify_plist_id_valid(4) is None
+            assert self.dbg.verify_a_plist_id_is_valid(4) is None
 
-    def test_get_all_tracked_plist_files(self):
-        pass
+    def test_get_all_tracked_plist_files_for_three_rows_of_data(self):
+        """Test `get_all_tracked_plist_files` works on an ID from three synthetic rows
+        of data.
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+        expected = [
+            (
+                1,
+                "mock_plist_1",
+                "script_1",
+                "2024-03-28T08:30:00Z",
+                "interval",
+                "300",
+                "running",
+            ),
+            (
+                2,
+                "mock_plist_2",
+                "script_2",
+                "2024-04-28T09:30:00Z",
+                "calendar",
+                "{Hour: 15}",
+                "running",
+            ),
+            (
+                3,
+                "mock_plist_3",
+                "script_3",
+                "2024-04-28T09:30:00Z",
+                "interval",
+                "1000",
+                "inactive",
+            ),
+        ]
+        actual = self.dbg.get_all_tracked_plist_files()
+        assert actual == expected
 
-    def test_get_a_single_plist_file(self):
-        pass
+    def test_get_all_tracked_plist_files_return_type_is_a_list(self):
+        """Assert the return type of ``get_all_tracked_plist_files`` is a list."""
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+        actual = self.dbg.get_all_tracked_plist_files()
+        assert isinstance(actual, list)
+
+    def test_get_all_tracked_plist_files_returns_list_of_tuples(self):
+        """Assert ``get_all_tracked_plist_files`` returns a list of tuples."""
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+        actual = self.dbg.get_all_tracked_plist_files()
+        assert all(isinstance(item, tuple) for item in actual)
+
+    def test_get_all_tracked_plist_files_on_an_empty_database(self):
+        """Assert ``get_all_tracked_plist_files`` returns an empty list for an empty
+        database. This test uses the mock environment fixture which has a valid, empty
+        db.
+        """
+        actual = self.dbg.get_all_tracked_plist_files()
+        expected = []
+        assert actual == expected
+
+    def test_get_all_tracked_plist_files_if_the_db_doesnt_exist(self):
+        """Test ``get_all_tracked_plist_files`` if the database doesn't exist (a user
+        could delete the db manually, for example).
+
+        The test uses Path.unlink() to delete the file, then attempts to collect data -
+        which creates a new empty database from which the method returns no data.
+        """
+        self.dbg._user_config.ldm_db_file.unlink()
+        actual = self.dbg.get_all_tracked_plist_files()
+        expected = []
+        assert actual == expected
+
+    def test_get_a_single_plist_file_details_for_a_valid_plist_file_id(self):
+        """Test ``get_a_single_plist_file`` works for a valid ID from three synthetic
+        rows of data.
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+        actual = self.dbg.get_a_single_plist_file_details(1)
+        expected = {
+            "PlistFileID": 1,
+            "PlistFileName": "mock_plist_1",
+            "ScriptName": "script_1",
+            "CreatedDate": "2024-03-28T08:30:00Z",
+            "ScheduleType": "interval",
+            "ScheduleValue": "300",
+            "CurrentState": "running",
+            "Description": "Mock plist file number 1",
+        }
+        assert actual == expected
+
+    def test_get_a_single_plist_file_details_for_a_valid_plist_file_id_returns_dict(
+        self,
+    ):
+        """Test ``get_a_single_plist_file`` works for a valid ID from three synthetic
+        rows of data.
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+        actual = self.dbg.get_a_single_plist_file_details(1)
+        assert isinstance(actual, dict)
+
+    def test_get_a_single_plist_file_details_for_an_invalid_plist_file_id(self):
+        """Test `get_a_single_plist_file` for plist file id not in the database."""
+        actual = self.dbg.get_a_single_plist_file_details(1)
+        expected = []
+        assert actual == expected
+
+    def test_get_a_single_plist_file_details_for_an_invalid_plist_file_id_returns_list(
+        self,
+    ):
+        """Test `get_a_single_plist_file` for plist file id not in the database."""
+        actual = self.dbg.get_a_single_plist_file_details(1)
+        assert isinstance(actual, list)
