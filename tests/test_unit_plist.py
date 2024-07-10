@@ -746,3 +746,27 @@ class TestDbGetters:
         """
         with pytest.raises(PlistFileIDNotFound):
             actual = self.dbg.get_a_single_plist_file_details(1)
+
+
+class TestDbDisplayerBase:
+    def test_init(self):
+        pass
+
+    def test_format_date(self):
+        pass
+
+    def test_style_xml_tags(self):
+        pass
+
+
+class TestDbAllRowsDisplayer:
+    def test_display_all_rows_table(self):
+        pass
+
+    def test_create_table(self):
+        pass
+
+
+class DbPlistDetailDisplayer:
+    def test_display_plist_detail(self):
+        pass
