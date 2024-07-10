@@ -2,15 +2,15 @@ import argparse
 import shutil
 from pathlib import Path
 
-from launchd_me import plist
 from launchd_me.logger_config import logger
 from launchd_me.plist import (
-    DBAllRowsDisplayer,
-    DBPlistDetailDisplayer,
+    DbAllRowsDisplayer,
+    DbPlistDetailDisplayer,
     LaunchdMeInit,
     PlistCreator,
     PlistDbGetters,
     PlistDbSetters,
+    PlistFileIDNotFound,
     PlistInstallationManager,
     ScheduleType,
     UserConfig,
@@ -75,7 +75,7 @@ def get_args():
 
     parser_list = subparsers.add_parser("list", help="List all tracked plist files.")
     parser_list.add_argument(
-        "-p", "--plist-id", help="Display details of given plist file."
+        "-p", "--plist-id", type=int, help="Display details of given plist file."
     )
 
     parser_install = subparsers.add_parser(
@@ -123,13 +123,13 @@ def create_plist(args):
 def list_plists(args):
     db_getters = PlistDbGetters(USER_CONFIG)
     if args.plist_id:
-        db_plist_displayer = DBPlistDetailDisplayer()
-        row = db_getters.get_a_single_plist_file(args.plist_id)
+        db_plist_displayer = DbPlistDetailDisplayer()
+        row = db_getters.get_a_single_plist_file_details(args.plist_id)
         db_plist_displayer.display_plist_detail(row)
     else:
         logger.debug("Calling 'display_all_tracked_plist_files().")
         all_rows = db_getters.get_all_tracked_plist_files()
-        db_all_rows_displayer = DBAllRowsDisplayer()
+        db_all_rows_displayer = DbAllRowsDisplayer()
         db_all_rows_displayer.display_all_rows_table(all_rows)
 
 
@@ -137,8 +137,8 @@ def install_plist(args):
     db_getter = PlistDbGetters(USER_CONFIG)
     db_setter = PlistDbSetters(USER_CONFIG)
     install_manager = PlistInstallationManager(USER_CONFIG, db_setter)
-    db_getter.verify_plist_id_valid(args.plist_id)
-    plist_detail = db_getter.get_a_single_plist_file(args.plist_id)
+    db_getter.verify_a_plist_id_is_valid(args.plist_id)
+    plist_detail = db_getter.get_a_single_plist_file_details(args.plist_id)
     plist_filename = Path(plist_detail["PlistFileName"])
     plist_file_path = Path(USER_CONFIG.plist_dir) / plist_filename
     install_manager.install_plist(args.plist_id, plist_file_path)
@@ -160,8 +160,8 @@ def uninstall_plist(args: argparse.Namespace) -> None:
     db_getter = PlistDbGetters(USER_CONFIG)
     db_setter = PlistDbSetters(USER_CONFIG)
     install_manager = PlistInstallationManager(USER_CONFIG, db_setter)
-    db_getter.verify_plist_id_valid(args.plist_id)
-    plist_detail = db_getter.get_a_single_plist_file(args.plist_id)
+    db_getter.verify_a_plist_id_is_valid(args.plist_id)
+    plist_detail = db_getter.get_a_single_plist_file_details(args.plist_id)
     plist_file_name = Path(plist_detail["PlistFileName"])
     symlink_to_plist = USER_CONFIG.launch_agents_dir / plist_file_name
     install_manager.uninstall_plist(args.plist_id, symlink_to_plist)
@@ -190,7 +190,10 @@ def main():
         "reset": reset_user,
     }
     command = args.command
-    if command in command_dispatcher:
-        command_dispatcher[command](args)
-    else:
-        print(f"Unknown command: {command}")
+    try:
+        if command in command_dispatcher:
+            command_dispatcher[command](args)
+        else:
+            print(f"Unknown command: {command}")
+    except PlistFileIDNotFound as error:
+        print(error)

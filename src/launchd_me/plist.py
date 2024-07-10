@@ -564,18 +564,25 @@ class PlistFileIDNotFound(Exception):
 
 
 class PlistDbGetters:
-    """Getters for database values. For displaying values use ``DBDisplayer()``."""
+    """Getters for database values. For displaying the values use a `DbDisplayer()`."""
 
-    def __init__(self, user_config: UserConfig):
+    def __init__(self, user_config: UserConfig) -> None:
+        """Initializer. ``user_config`` supplies the path to the database.
+
+        Parameters
+        ----------
+        user_config: UserConfig
+            A UserConfig object.
+        """
         self._user_config = user_config
 
-    def verify_plist_id_valid(self, plist_id):
-        """Checks if a plist ID is valid.
+    def verify_a_plist_id_is_valid(self, plist_id) -> None:
+        """Checks if a plist file ID is valid.
 
         Attributes
         ----------
-        plist_id: Any
-            A plist_id. No type checks are done to verify an int.
+        plist_id: int
+            A plist_id as an int. Argparse validates the user input as an int.
 
         Raises
         ------
@@ -589,17 +596,18 @@ class PlistDbGetters:
             )
             target_row = cursor.fetchall()
             if not target_row:
-                print("target row is none")
-                raise (PlistFileIDNotFound)
+                message = f"There is no plist file with the ID: {plist_id}"
+                logger.error(message)
+                raise PlistFileIDNotFound(message)
             logger.debug(f'Plist_id "{plist_id}" is in the database')
 
-    def get_all_tracked_plist_files(self) -> tuple[Row, ...]:
-        """Get all details of all tracked plist files, including 'deleted' files.
+    def get_all_tracked_plist_files(self) -> list[tuple]:
+        """Get details of all tracked plist files.
 
         Returns
         -------
-        all_rows: tuple[Row, ...]
-            A tuple of all database rows as SQLite3 Row objects, where Row[0] =
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
             "PlistFileID" etc.
         """
         with PListDbConnectionManager(self._user_config) as cursor:
@@ -611,23 +619,28 @@ class PlistDbGetters:
             all_rows = cursor.fetchall()
         return all_rows
 
-    def get_a_single_plist_file(self, plist_id) -> dict:
-        """Get column headings and details of a given plist file.
+    def get_a_single_plist_file_details(self, plist_id) -> dict:
+        """Get all details and column headings of a given plist file.
 
-        Uses an SQLite query to get the plist file details then the `cursor.description`
-        attribute to get the column headings. These are zipped into a dictionary in the
-        format ``{"field_name", value}``.
+        The method calls ``verify_a_plist_is_valid`` to verify ``plist_id`` is in the
+        database. The method fetches the plist file details then the uses
+        `cursor.description` attribute to fetch the column headings. These column
+        headings and plist file details are zipped into a dictionary in the format
+        ``{"field_name": "value"}``.
 
-        Attributes
+        Parameters
         ----------
         plist_id: int
-            The id of the plist file.
+            A plist_id as an int. Argparse validates the user input as an int.
 
         Returns
         -------
         plist_detail: dict
-            A dict of the plist file details in the format ``{"field_name", value}``.
+            A dict of the plist file details in the format ``{'PlistFileID': 1,
+            'PlistFileName': 'mock_plist_1' etc}``.
+
         """
+        self.verify_a_plist_id_is_valid(plist_id)
         with PListDbConnectionManager(self._user_config) as cursor:
             cursor.execute(
                 "SELECT * FROM  PlistFiles WHERE plistFileId = ?", (plist_id,)
@@ -638,7 +651,7 @@ class PlistDbGetters:
         return plist_detail
 
 
-class DBDisplayerBase:
+class DbDisplayerBase:
     def __init__(self) -> None:
         self._user_config = UserConfig()
         self._db_getter = PlistDbGetters(self._user_config)
@@ -665,7 +678,7 @@ class DBDisplayerBase:
         return styled_text
 
 
-class DBAllRowsDisplayer(DBDisplayerBase):
+class DbAllRowsDisplayer(DbDisplayerBase):
     def display_all_rows_table(self, all_rows) -> None:
         console = Console()
 
@@ -697,8 +710,21 @@ class DBAllRowsDisplayer(DBDisplayerBase):
         return table
 
 
-class DBPlistDetailDisplayer(DBDisplayerBase):
+class DbPlistDetailDisplayer(DbDisplayerBase):
+    """Display a detailed overview of a single plist file."""
+
     def display_plist_detail(self, plist_detail: dict) -> None:
+        """Display a detailed overview of a single plist file.
+
+        Note
+        ----
+        This is currently hardcoded to display the plist file content for every plist.
+
+        Parameters
+        ----------
+        plist_detail
+
+        """
         console = Console()
         table = Table()
         table.add_column("Plist File")
