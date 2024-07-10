@@ -619,7 +619,7 @@ class PlistDbGetters:
             all_rows = cursor.fetchall()
         return all_rows
 
-    def get_a_single_plist_file_details(self, plist_id) -> dict | list:
+    def get_a_single_plist_file_details(self, plist_id) -> dict:
         """Get all details and column headings of a given plist file.
 
         The method calls ``verify_a_plist_is_valid`` to verify ``plist_id`` is in the
