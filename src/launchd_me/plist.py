@@ -596,12 +596,13 @@ class PlistDbGetters:
             )
             target_row = cursor.fetchall()
             if not target_row:
-                print("target row is none")
-                raise (PlistFileIDNotFound)
+                message = f"There is no plist file with the ID: {plist_id}"
+                logger.error(message)
+                raise PlistFileIDNotFound(message)
             logger.debug(f'Plist_id "{plist_id}" is in the database')
 
     def get_all_tracked_plist_files(self) -> list[tuple]:
-        """Get details of all tracked plist files, including 'deleted' files.
+        """Get details of all tracked plist files.
 
         Returns
         -------
@@ -619,13 +620,13 @@ class PlistDbGetters:
         return all_rows
 
     def get_a_single_plist_file_details(self, plist_id) -> dict | list:
-        """Get column headings and details of a given plist file.
+        """Get all details and column headings of a given plist file.
 
-        Uses an SQLite query to get the plist file details then the `cursor.description`
-        attribute to get the column headings. These are zipped into a dictionary in the
-        format ``{"field_name", value}``.
-
-        If no data is returned then empty row value is returned.
+        The method calls ``verify_a_plist_is_valid`` to verify ``plist_id`` is in the
+        database. The method fetches the plist file details then the uses
+        `cursor.description` attribute to fetch the column headings. These column
+        headings and plist file details are zipped into a dictionary in the format
+        ``{"field_name": "value"}``.
 
         Parameters
         ----------
@@ -634,20 +635,19 @@ class PlistDbGetters:
 
         Returns
         -------
-        plist_detail: dict | list
+        plist_detail: dict
             A dict of the plist file details in the format ``{'PlistFileID': 1,
-            'PlistFileName': 'mock_plist_1' etc}`` or an empty list if no plist data
-            is found.
+            'PlistFileName': 'mock_plist_1' etc}``.
+
         """
+        self.verify_a_plist_id_is_valid(plist_id)
         with PListDbConnectionManager(self._user_config) as cursor:
             cursor.execute(
                 "SELECT * FROM  PlistFiles WHERE plistFileId = ?", (plist_id,)
             )
             target_row = cursor.fetchall()
-        plist_detail = target_row
-        if target_row:
             description = [description[0] for description in cursor.description]
-            plist_detail = dict(zip(description, target_row[0]))
+        plist_detail = dict(zip(description, target_row[0]))
         return plist_detail
 
 

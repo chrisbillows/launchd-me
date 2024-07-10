@@ -2,7 +2,6 @@ import argparse
 import shutil
 from pathlib import Path
 
-from launchd_me import plist
 from launchd_me.logger_config import logger
 from launchd_me.plist import (
     DbAllRowsDisplayer,
@@ -11,6 +10,7 @@ from launchd_me.plist import (
     PlistCreator,
     PlistDbGetters,
     PlistDbSetters,
+    PlistFileIDNotFound,
     PlistInstallationManager,
     ScheduleType,
     UserConfig,
@@ -190,7 +190,10 @@ def main():
         "reset": reset_user,
     }
     command = args.command
-    if command in command_dispatcher:
-        command_dispatcher[command](args)
-    else:
-        print(f"Unknown command: {command}")
+    try:
+        if command in command_dispatcher:
+            command_dispatcher[command](args)
+        else:
+            print(f"Unknown command: {command}")
+    except PlistFileIDNotFound as error:
+        print(error)

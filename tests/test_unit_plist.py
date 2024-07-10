@@ -633,7 +633,7 @@ class TestDbGetters:
             assert self.dbg.verify_a_plist_id_is_valid(4) is None
 
     def test_get_all_tracked_plist_files_for_three_rows_of_data(self):
-        """Test `get_all_tracked_plist_files` works on an ID from three synthetic rows
+        """Test `get_all_tracked_plist_files` works correctly with three synthetic rows
         of data.
         """
         add_three_plist_file_entries_to_a_plist_files_table(
@@ -679,7 +679,7 @@ class TestDbGetters:
         actual = self.dbg.get_all_tracked_plist_files()
         assert isinstance(actual, list)
 
-    def test_get_all_tracked_plist_files_returns_list_of_tuples(self):
+    def test_get_all_tracked_plist_files_returns_a_list_of_tuples(self):
         """Assert ``get_all_tracked_plist_files`` returns a list of tuples."""
         add_three_plist_file_entries_to_a_plist_files_table(
             self.dbg._user_config.ldm_db_file
@@ -728,12 +728,10 @@ class TestDbGetters:
         }
         assert actual == expected
 
-    def test_get_a_single_plist_file_details_for_a_valid_plist_file_id_returns_dict(
+    def test_get_a_single_plist_file_details_returns_a_dictionary(
         self,
     ):
-        """Test ``get_a_single_plist_file`` works for a valid ID from three synthetic
-        rows of data.
-        """
+        """Test ``get_a_single_plist_file`` for valid ID returns a dictionary."""
         add_three_plist_file_entries_to_a_plist_files_table(
             self.dbg._user_config.ldm_db_file
         )
@@ -741,14 +739,10 @@ class TestDbGetters:
         assert isinstance(actual, dict)
 
     def test_get_a_single_plist_file_details_for_an_invalid_plist_file_id(self):
-        """Test `get_a_single_plist_file` for plist file id not in the database."""
-        actual = self.dbg.get_a_single_plist_file_details(1)
-        expected = []
-        assert actual == expected
+        """Test `get_a_single_plist_file` for a plist id not in the database.
 
-    def test_get_a_single_plist_file_details_for_an_invalid_plist_file_id_returns_list(
-        self,
-    ):
-        """Test `get_a_single_plist_file` for plist file id not in the database."""
-        actual = self.dbg.get_a_single_plist_file_details(1)
-        assert isinstance(actual, list)
+        `get_a_single_plist_file` calls `verify_a_plist_id_is_valid` which will raise
+        an error if the plist is not in the database.
+        """
+        with pytest.raises(PlistFileIDNotFound):
+            actual = self.dbg.get_a_single_plist_file_details(1)
