@@ -5,7 +5,6 @@ from pathlib import Path
 from launchd_me.logger_config import logger
 from launchd_me.plist import (
     DbAllRowsDisplayer,
-    DbPlistDetailDisplayer,
     LaunchdMeInit,
     PlistCreator,
     PlistDbGetters,
@@ -123,13 +122,13 @@ def create_plist(args):
 def list_plists(args):
     db_getters = PlistDbGetters(USER_CONFIG)
     if args.plist_id:
-        db_plist_displayer = DbPlistDetailDisplayer()
+        db_displayer = DbAllRowsDisplayer()
         row = db_getters.get_a_single_plist_file_details(args.plist_id)
-        db_plist_displayer.display_plist_detail(row)
+        db_displayer.display_plist_detail(row)
     else:
         logger.debug("Calling 'display_all_tracked_plist_files().")
         all_rows = db_getters.get_all_tracked_plist_files()
-        db_all_rows_displayer = DbAllRowsDisplayer()
+        db_all_rows_displayer = DbAllRowsDisplayer(USER_CONFIG)
         db_all_rows_displayer.display_all_rows_table(all_rows)
 
 

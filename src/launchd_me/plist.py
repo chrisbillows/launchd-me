@@ -638,7 +638,6 @@ class PlistDbGetters:
         plist_detail: dict
             A dict of the plist file details in the format ``{'PlistFileID': 1,
             'PlistFileName': 'mock_plist_1' etc}``.
-
         """
         self.verify_a_plist_id_is_valid(plist_id)
         with PListDbConnectionManager(self._user_config) as cursor:
@@ -651,17 +650,16 @@ class PlistDbGetters:
         return plist_detail
 
 
+# TODO: Lets consolidate this all into one class.
 class DbDisplayerBase:
-    def __init__(self) -> None:
-        self._user_config = UserConfig()
-        self._db_getter = PlistDbGetters(self._user_config)
+    def __init__(self, user_config: UserConfig) -> None:
+        self._user_config = user_config
 
-    def _format_date(self, row: list):
-        """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date at index 3."""
-        iso_date = datetime.fromisoformat(row[3])
+    def _format_date(self, iso_date: str):
+        """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date."""
+        iso_date = datetime.fromisoformat(iso_date)
         formatted_date = iso_date.strftime("%d-%m-%Y")
-        row[3] = formatted_date
-        return row
+        return formatted_date
 
     def _style_xml_tags(self, text_to_style):
         re_pattern = r"<([^>]+)>"
@@ -679,18 +677,45 @@ class DbDisplayerBase:
 
 
 class DbAllRowsDisplayer(DbDisplayerBase):
-    def display_all_rows_table(self, all_rows) -> None:
+    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
+        """Public method to display rows of PlistFileData in a table.
+
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
+            "PlistFileID" etc.
+        """
+        table = self._create_table(all_rows)
+        self._table_displayer(table)
+
+    def _table_displayer(self, table: Table) -> None:
+        """Print a table to the console.
+
+        Isolated for easy testing.
+
+        Parameters
+        ----------
+        table: Table
+            A rich Table object.
+        """
         console = Console()
+        console.print("\n", table)
 
-        table = self._create_table()
-        for row in all_rows:
-            row = list(row)
-            row = self._format_date(row)
-            table.add_row(*[str(item) for item in row])
-        print()  # Just to give an extra line for style.
-        console.print(table)
+    def _create_table(self, all_rows) -> Table:
+        """Create a formatted `rich` Table to display rows of PlistFile data.
 
-    def _create_table(self) -> Table:
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
+            "PlistFileID" etc.
+
+        Returns
+        -------
+        table: Table
+            A formatted `rich` table containing the ``all_rows`` data.
+        """
         table = Table(box=rich.box.SIMPLE, show_header=True)
         table.title = f"  USER `{self._user_config.user_name}` PERSONAL PLIST FILES"
         table.caption = "Run `ldm list <ID> for full plist file details."
@@ -698,7 +723,7 @@ class DbAllRowsDisplayer(DbDisplayerBase):
         table.title_style = "blue3 bold italic"
         table.add_column("File\nID", justify="center", overflow="wrap")
         table.add_column(
-            "Plist Filename", justify="center", overflow="fold", no_wrap=True
+            "Plist Filename", justify="left", overflow="fold", no_wrap=True
         )
         table.add_column(
             "Script Called", justify="center", overflow="fold", style="magenta"
@@ -707,13 +732,14 @@ class DbAllRowsDisplayer(DbDisplayerBase):
         table.add_column("Schedule\nType", justify="center", overflow="fold")
         table.add_column("Schedule\nValue", justify="center", overflow="fold")
         table.add_column("Status", justify="center", overflow="fold")
+        for row in all_rows:
+            row = list(row)
+            row[3] = self._format_date(row[3])
+            table.add_row(*[str(item) for item in row])
         return table
 
-
-class DbPlistDetailDisplayer(DbDisplayerBase):
-    """Display a detailed overview of a single plist file."""
-
-    def display_plist_detail(self, plist_detail: dict) -> None:
+    # TODO: Refactor once we actually have plist file contents in the db.
+    def display_plist_detail(self, plist_detail) -> None:
         """Display a detailed overview of a single plist file.
 
         Note
@@ -722,7 +748,8 @@ class DbPlistDetailDisplayer(DbDisplayerBase):
 
         Parameters
         ----------
-        plist_detail
+        plist_detail:
+
 
         """
         console = Console()

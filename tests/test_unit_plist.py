@@ -17,10 +17,14 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from unittest import mock
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+import rich.box
 from launchd_me.plist import (
+    DbAllRowsDisplayer,
+    DbDisplayerBase,
     LaunchdMeInit,
     PlistCreator,
     PListDbConnectionManager,
@@ -35,6 +39,7 @@ from launchd_me.sql_statements import (
     PLISTFILES_TABLE_INSERT_INTO,
     PLISTFILES_TABLE_SELECT_ALL,
 )
+from rich.table import Column, Row, Table
 
 from tests.conftest import (
     ConfiguredEnvironmentObjects,
@@ -749,8 +754,8 @@ class TestDbGetters:
 
 
 class TestDbDisplayerBase:
-    def test_init(self):
-        pass
+    def test_init(self, mock_environment):
+        dbd = DbDisplayerBase(mock_environment.user_config)
 
     def test_format_date(self):
         pass
@@ -759,12 +764,209 @@ class TestDbDisplayerBase:
         pass
 
 
-class TestDbAllRowsDisplayer:
-    def test_display_all_rows_table(self):
-        pass
+class TestDbAllRowsDisplayerCreateTable:
+    @pytest.fixture(autouse=True)
+    def provide_empty_db_for_all_tests_in_class(self, mock_environment):
+        """Create a table and pass to all tests in the class via ``self.actual_table``.
 
-    def test_create_table(self):
-        pass
+        Fixture to create a table using a ``DbAllRowsDisplayer`` instance and the
+        ``_create_table`` method.
+
+        The fixture uses the ``mock_environment`` fixture to create an empty database.
+        The function ``add_three_plist_file_entries_to_a_plist_files_table`` populates
+        the database with three rows of data.
+
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            mock_environment.user_config.ldm_db_file
+        )
+        connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT PlistFileID, PlistFileName, ScriptName, CreatedDate, "
+            "ScheduleType, ScheduleValue, CurrentState FROM PlistFiles"
+            " ORDER BY PlistFileID"
+        )
+        all_rows = cursor.fetchall()
+        self.db_all_rows_displayer = DbAllRowsDisplayer(mock_environment.user_config)
+        self.actual_table = self.db_all_rows_displayer._create_table(all_rows)
+
+    def test_table_displayer(self, mock_environment):
+        """Test ``_table_displayer`` which only passes the table to console output."""
+        with patch("launchd_me.plist.Console") as MockConsole:
+            mock_console = MockConsole.return_value
+            dba = DbAllRowsDisplayer(mock_environment.user_config)
+            dba._table_displayer("a_table_object")
+            MockConsole.assert_called_once()
+            mock_console.print.assert_called_once_with("\n", "a_table_object")
+
+    @pytest.mark.parametrize(
+        "attribute, expected_value",
+        [
+            ("box", rich.box.SIMPLE),
+            ("title", "  USER `mock_user_name` PERSONAL PLIST FILES"),
+            ("title_justify", "left"),
+            ("title_style", "blue3 bold italic"),
+            ("caption", "Run `ldm list <ID> for full plist file details."),
+            ("row_count", 3),
+            (
+                "rows",
+                [
+                    Row(style=None, end_section=False),
+                    Row(style=None, end_section=False),
+                    Row(style=None, end_section=False),
+                ],
+            ),
+        ],
+    )
+    def test_create_table_attributes(self, attribute, expected_value):
+        """Assert that a Table object has the expected attributes"""
+        assert getattr(self.actual_table, attribute) == expected_value
+
+    def test_create_table_first_column_styling_and_contents(self):
+        """Assert that a Table object has the expected column values. Each column is
+        tested individually in full."""
+        expected_first_column = Column(
+            header="File\nID",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="wrap",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=0,
+            _cells=["1", "2", "3"],
+        )
+        actual_first_column = self.actual_table.columns[0]
+        assert actual_first_column == expected_first_column
+
+    def test_create_table_second_column_styling_and_contents(self):
+        expected_column = Column(
+            header="Plist Filename",
+            justify="left",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=True,
+            _index=1,
+            _cells=["mock_plist_1", "mock_plist_2", "mock_plist_3"],
+        )
+        actual_first_column = self.actual_table.columns[1]
+        assert actual_first_column == expected_column
+
+    def test_create_table_third_column_styling_and_contents(self):
+        expected_column = Column(
+            header="Script Called",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="magenta",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=2,
+            _cells=["script_1", "script_2", "script_3"],
+        )
+        actual_first_column = self.actual_table.columns[2]
+        assert actual_first_column == expected_column
+
+    def test_create_table_fourth_column_styling_and_contents(self):
+        expected_column = Column(
+            header="Plist\nCreated",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=3,
+            _cells=["28-03-2024", "28-04-2024", "28-04-2024"],
+        )
+        actual_first_column = self.actual_table.columns[3]
+        assert actual_first_column == expected_column
+
+    def test_create_table_fifth_column_styling_and_contents(self):
+        expected_column = Column(
+            header="Schedule\nType",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=4,
+            _cells=["interval", "calendar", "interval"],
+        )
+        actual_first_column = self.actual_table.columns[4]
+        assert actual_first_column == expected_column
+
+    def test_create_table_sixth_column_styling_and_contents(self):
+        expected_column = Column(
+            header="Schedule\nValue",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=5,
+            _cells=["300", "{Hour: 15}", "1000"],
+        )
+        actual_first_column = self.actual_table.columns[5]
+        assert actual_first_column == expected_column
+
+    def test_create_table_seventh_column_styling_and_contents(self):
+        expected_column = Column(
+            header="Status",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=6,
+            _cells=["running", "running", "inactive"],
+        )
+        actual_first_column = self.actual_table.columns[6]
+        assert actual_first_column == expected_column
 
 
 class DbPlistDetailDisplayer:
