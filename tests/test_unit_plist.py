@@ -23,8 +23,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 import rich.box
 from launchd_me.plist import (
-    DbAllRowsDisplayer,
-    DbDisplayerBase,
+    DbDisplayer,
     LaunchdMeInit,
     PlistCreator,
     PListDbConnectionManager,
@@ -753,23 +752,12 @@ class TestDbGetters:
             actual = self.dbg.get_a_single_plist_file_details(1)
 
 
-class TestDbDisplayerBase:
-    def test_init(self, mock_environment):
-        dbd = DbDisplayerBase(mock_environment.user_config)
-
-    def test_format_date(self):
-        pass
-
-    def test_style_xml_tags(self):
-        pass
-
-
 class TestDbAllRowsDisplayerCreateTable:
     @pytest.fixture(autouse=True)
     def provide_empty_db_for_all_tests_in_class(self, mock_environment):
-        """Create a table and pass to all tests in the class via ``self.actual_table``.
+        """Create a Table and pass to all tests in the class via ``self.actual_table``.
 
-        Fixture to create a table using a ``DbAllRowsDisplayer`` instance and the
+        Fixture to create a rich Table using a ``DbAllRowsDisplayer`` instance and the
         ``_create_table`` method.
 
         The fixture uses the ``mock_environment`` fixture to create an empty database.
@@ -788,14 +776,33 @@ class TestDbAllRowsDisplayerCreateTable:
             " ORDER BY PlistFileID"
         )
         all_rows = cursor.fetchall()
-        self.db_all_rows_displayer = DbAllRowsDisplayer(mock_environment.user_config)
-        self.actual_table = self.db_all_rows_displayer._create_table(all_rows)
+        self.db_displayer = DbDisplayer(mock_environment.user_config)
+        self.actual_table = self.db_displayer._create_table(all_rows)
+
+    def test_init(self):
+        """Sense check to ensure a DbDisplayer initialises as expected."""
+        assert self.db_displayer._user_config.user_name == "mock_user_name"
+
+    @pytest.mark.parametrize(
+        "iso_date_string, expected",
+        [
+            ("2024-07-15T12:34:56+09:00", "15-07-2024"),
+            ("2024-06-21T08:22:31-04:00", "21-06-2024"),
+            ("2024-09-10T17:45:12+01:00", "10-09-2024"),
+        ],
+    )
+    def test_format_date(self, iso_date_string, expected):
+        actual = self.db_displayer._format_date(iso_date_string)
+        assert actual == expected
+
+    def test_style_xml_tags(self):
+        pass
 
     def test_table_displayer(self, mock_environment):
         """Test ``_table_displayer`` which only passes the table to console output."""
         with patch("launchd_me.plist.Console") as MockConsole:
             mock_console = MockConsole.return_value
-            dba = DbAllRowsDisplayer(mock_environment.user_config)
+            dba = DbDisplayer(mock_environment.user_config)
             dba._table_displayer("a_table_object")
             MockConsole.assert_called_once()
             mock_console.print.assert_called_once_with("\n", "a_table_object")
@@ -820,12 +827,12 @@ class TestDbAllRowsDisplayerCreateTable:
         ],
     )
     def test_create_table_attributes(self, attribute, expected_value):
-        """Assert that a Table object has the expected attributes"""
+        """Assert that a Table has the expected attributes (excluding columns)."""
         assert getattr(self.actual_table, attribute) == expected_value
 
     def test_create_table_first_column_styling_and_contents(self):
-        """Assert that a Table object has the expected column values. Each column is
-        tested individually in full."""
+        """Assert that a Table object has the expected column styling and attributes.
+        Each column is a Column objected and is tested individually in full."""
         expected_first_column = Column(
             header="File\nID",
             footer="",
@@ -967,8 +974,3 @@ class TestDbAllRowsDisplayerCreateTable:
         )
         actual_first_column = self.actual_table.columns[6]
         assert actual_first_column == expected_column
-
-
-class DbPlistDetailDisplayer:
-    def test_display_plist_detail(self):
-        pass

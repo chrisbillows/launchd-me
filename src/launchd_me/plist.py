@@ -650,18 +650,66 @@ class PlistDbGetters:
         return plist_detail
 
 
-# TODO: Lets consolidate this all into one class.
-class DbDisplayerBase:
+class DbDisplayer:
     def __init__(self, user_config: UserConfig) -> None:
         self._user_config = user_config
 
-    def _format_date(self, iso_date: str):
+    # TODO: Refactor once we actually have plist file contents in the db.
+    def display_plist_detail(self, plist_detail) -> None:
+        """Display a detailed overview of a single plist file.
+
+        Note
+        ----
+        This is currently hardcoded to display the plist file content for every plist.
+
+        Parameters
+        ----------
+        plist_detail:
+
+
+        """
+        console = Console()
+        table = Table()
+        table.add_column("Plist File")
+        table.add_column("Details")
+        for field_name, value in plist_detail.items():
+            if isinstance(value, int):
+                value = str(value)
+            if field_name == "ScriptName":
+                table.add_row(field_name, value, style="magenta")
+            else:
+                table.add_row(field_name, value)
+        file = "/Users/chrisbillows/launchd-me/plist_files/local.chrisbillows.whole_new_name_0001.plist"
+        table.add_row("________________", "________________")
+        table.add_row("PlistFileContent", "")
+        with open(file, "r") as file_handle:
+            contents = file_handle.readlines()
+        for line in contents:
+            output = line.replace("\n", "")
+            output = self._style_xml_tags(output)
+            table.add_row("", output)
+        print()  # Just to give an extra line for style.
+        console.print(table)
+
+    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
+        """Public method to display rows of PlistFileData in a table.
+
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
+            "PlistFileID" etc.
+        """
+        table = self._create_table(all_rows)
+        self._table_displayer(table)
+
+    def _format_date(self, iso_date: str) -> str:
         """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date."""
         iso_date = datetime.fromisoformat(iso_date)
         formatted_date = iso_date.strftime("%d-%m-%Y")
         return formatted_date
 
-    def _style_xml_tags(self, text_to_style):
+    def _style_xml_tags(self, text_to_style: str) -> str:
         re_pattern = r"<([^>]+)>"
         matches = re.finditer(re_pattern, text_to_style)
         last_end = 0
@@ -674,20 +722,6 @@ class DbDisplayerBase:
             last_end = end
         styled_text += text_to_style[last_end:]
         return styled_text
-
-
-class DbAllRowsDisplayer(DbDisplayerBase):
-    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
-        """Public method to display rows of PlistFileData in a table.
-
-        Parameters
-        ----------
-        all_rows: list[tuple]
-            A list of all database rows as tuples, where tuple[0] =
-            "PlistFileID" etc.
-        """
-        table = self._create_table(all_rows)
-        self._table_displayer(table)
 
     def _table_displayer(self, table: Table) -> None:
         """Print a table to the console.
@@ -737,40 +771,3 @@ class DbAllRowsDisplayer(DbDisplayerBase):
             row[3] = self._format_date(row[3])
             table.add_row(*[str(item) for item in row])
         return table
-
-    # TODO: Refactor once we actually have plist file contents in the db.
-    def display_plist_detail(self, plist_detail) -> None:
-        """Display a detailed overview of a single plist file.
-
-        Note
-        ----
-        This is currently hardcoded to display the plist file content for every plist.
-
-        Parameters
-        ----------
-        plist_detail:
-
-
-        """
-        console = Console()
-        table = Table()
-        table.add_column("Plist File")
-        table.add_column("Details")
-        for field_name, value in plist_detail.items():
-            if isinstance(value, int):
-                value = str(value)
-            if field_name == "ScriptName":
-                table.add_row(field_name, value, style="magenta")
-            else:
-                table.add_row(field_name, value)
-        file = "/Users/chrisbillows/launchd-me/plist_files/local.chrisbillows.whole_new_name_0001.plist"
-        table.add_row("________________", "________________")
-        table.add_row("PlistFileContent", "")
-        with open(file, "r") as file_handle:
-            contents = file_handle.readlines()
-        for line in contents:
-            output = line.replace("\n", "")
-            output = self._style_xml_tags(output)
-            table.add_row("", output)
-        print()  # Just to give an extra line for style.
-        console.print(table)
