@@ -651,10 +651,32 @@ class PlistDbGetters:
 
 
 class DbDisplayer:
+    """Display Plist data to the user."""
+
     def __init__(self, user_config: UserConfig) -> None:
+        """Initializer. ``user_config`` supplies the path to the database.
+
+        Parameters
+        ----------
+        user_config: UserConfig
+            A UserConfig object.
+        """
         self._user_config = user_config
 
+    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
+        """Public method to display PlistFile summary data in a table.
+
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
+            "PlistFileID" etc.
+        """
+        table = self._create_table(all_rows)
+        self._table_displayer(table)
+
     # TODO: Refactor once we actually have plist file contents in the db.
+    # Add type of `plist_detail`
     def display_plist_detail(self, plist_detail) -> None:
         """Display a detailed overview of a single plist file.
 
@@ -665,8 +687,7 @@ class DbDisplayer:
         Parameters
         ----------
         plist_detail:
-
-
+            #TODO: Confirm what type is.
         """
         console = Console()
         table = Table()
@@ -691,25 +712,32 @@ class DbDisplayer:
         print()  # Just to give an extra line for style.
         console.print(table)
 
-    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
-        """Public method to display rows of PlistFileData in a table.
+    def _format_date(self, iso_datetime: str) -> str:
+        """Reformat a valid ISO datetime string as YYYY-MM-DD for display.
+
+        Notes
+        -----
+        Prior to Python 3.11, ``datetime.isoformat`` only supported ISO formats that
+        could be emitted by ``date.isoformat()`` or ``datetime.isoformat()``. The Z UTC
+        suffix format was not supported. To support earlier Python versions
+        ``_format_date`` replaces Z UTC suffixes with a UTC "+00:00" string.
+
+        For more see:
+        https://docs.python.org/3.11/library/datetime.html#datetime.datetime.fromisoformat
 
         Parameters
         ----------
-        all_rows: list[tuple]
-            A list of all database rows as tuples, where tuple[0] =
-            "PlistFileID" etc.
+        iso_datetime: str
+            A valid ISO datetime.
         """
-        table = self._create_table(all_rows)
-        self._table_displayer(table)
-
-    def _format_date(self, iso_date: str) -> str:
-        """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date."""
-        iso_date = datetime.fromisoformat(iso_date)
-        formatted_date = iso_date.strftime("%d-%m-%Y")
+        if iso_datetime.endswith("Z"):
+            iso_datetime = iso_datetime.replace("Z", "+00:00")
+        iso_datetime = datetime.fromisoformat(iso_datetime)
+        formatted_date = iso_datetime.strftime("%d-%m-%Y")
         return formatted_date
 
     def _style_xml_tags(self, text_to_style: str) -> str:
+        """Add Rich styling to any XML opening/closing tags in a string."""
         re_pattern = r"<([^>]+)>"
         matches = re.finditer(re_pattern, text_to_style)
         last_end = 0
@@ -724,9 +752,7 @@ class DbDisplayer:
         return styled_text
 
     def _table_displayer(self, table: Table) -> None:
-        """Print a table to the console.
-
-        Isolated for easy testing.
+        """Print a table to the console. Isolated for easy testing.
 
         Parameters
         ----------

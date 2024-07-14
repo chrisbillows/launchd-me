@@ -752,18 +752,15 @@ class TestDbGetters:
             actual = self.dbg.get_a_single_plist_file_details(1)
 
 
-class TestDbAllRowsDisplayerCreateTable:
+class TestDbDisplayer:
     @pytest.fixture(autouse=True)
-    def provide_empty_db_for_all_tests_in_class(self, mock_environment):
-        """Create a Table and pass to all tests in the class via ``self.actual_table``.
+    def setup_for_all_tests_in_class(self, mock_environment):
+        """Create a ``DbDisplayer`` instance and a formatted Table and pass them to all
+        tests in the class via ``self.db_displayer`` and ``self.actual_table``.
 
-        Fixture to create a rich Table using a ``DbAllRowsDisplayer`` instance and the
-        ``_create_table`` method.
-
-        The fixture uses the ``mock_environment`` fixture to create an empty database.
-        The function ``add_three_plist_file_entries_to_a_plist_files_table`` populates
-        the database with three rows of data.
-
+        This fixture uses ``mock_environment`` to create an empty database. This fixture
+        then calls ``add_three_plist_file_entries_to_a_plist_files_table`` which
+        populates the newly created database with three rows of synthetic data.
         """
         add_three_plist_file_entries_to_a_plist_files_table(
             mock_environment.user_config.ldm_db_file
@@ -789,17 +786,46 @@ class TestDbAllRowsDisplayerCreateTable:
             ("2024-07-15T12:34:56+09:00", "15-07-2024"),
             ("2024-06-21T08:22:31-04:00", "21-06-2024"),
             ("2024-09-10T17:45:12+01:00", "10-09-2024"),
+            ("2024-09-10T17:45:12Z", "10-09-2024"),
         ],
     )
     def test_format_date(self, iso_date_string, expected):
+        """Test ``_format_date`` on a random selection of ISO formatted datetime
+        strings. ``_format_date`` expects valid ISO formatted strings.
+
+        Tests against a Z formatted datetime string. These are not natively supported by
+        ``datetime.fromisoformat`` before Python 3.11. The ``_format_date`` method
+        reformats Z formatted datetime strings.
+        """
         actual = self.db_displayer._format_date(iso_date_string)
         assert actual == expected
 
-    def test_style_xml_tags(self):
-        pass
+    @pytest.mark.parametrize(
+        "xml_formatted_string, expected",
+        [
+            (
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '[grey69]<?xml version="1.0" encoding="UTF-8"?>[/grey69]',
+            ),
+            (
+                "<key>ProgramArguments</key>",
+                "[grey69]<key>[/grey69]ProgramArguments[grey69]</key>[/grey69]",
+            ),
+            ("<dict>", "[grey69]<dict>[/grey69]"),
+            ("</plist>", "[grey69]</plist>[/grey69]"),
+        ],
+    )
+    def test_style_xml_tags(self, xml_formatted_string, expected):
+        """Test ``style_xml_tags`` adds ``rich`` renderable formatting to any opening or
+        closing XML tag."""
+        actual = self.db_displayer._style_xml_tags(xml_formatted_string)
+        assert actual == expected
 
     def test_table_displayer(self, mock_environment):
-        """Test ``_table_displayer`` which only passes the table to console output."""
+        """Test ``_table_displayer`` which only passes the table to console output.
+        The test asserts that a console was created and that print was called on the
+        Console object with the expected values.
+        """
         with patch("launchd_me.plist.Console") as MockConsole:
             mock_console = MockConsole.return_value
             dba = DbDisplayer(mock_environment.user_config)
@@ -832,7 +858,10 @@ class TestDbAllRowsDisplayerCreateTable:
 
     def test_create_table_first_column_styling_and_contents(self):
         """Assert that a Table object has the expected column styling and attributes.
-        Each column is a Column objected and is tested individually in full."""
+        Each column is a Column objected and is tested individually in full.
+
+        Tests the styling and contents of the first column.
+        """
         expected_first_column = Column(
             header="File\nID",
             footer="",
@@ -854,6 +883,7 @@ class TestDbAllRowsDisplayerCreateTable:
         assert actual_first_column == expected_first_column
 
     def test_create_table_second_column_styling_and_contents(self):
+        """Test the styling and contents of the second column."""
         expected_column = Column(
             header="Plist Filename",
             justify="left",
@@ -871,6 +901,7 @@ class TestDbAllRowsDisplayerCreateTable:
         assert actual_first_column == expected_column
 
     def test_create_table_third_column_styling_and_contents(self):
+        """Test the styling and contents of the third column."""
         expected_column = Column(
             header="Script Called",
             footer="",
@@ -892,6 +923,7 @@ class TestDbAllRowsDisplayerCreateTable:
         assert actual_first_column == expected_column
 
     def test_create_table_fourth_column_styling_and_contents(self):
+        """Test the styling and contents of the fourth column."""
         expected_column = Column(
             header="Plist\nCreated",
             footer="",
@@ -913,6 +945,7 @@ class TestDbAllRowsDisplayerCreateTable:
         assert actual_first_column == expected_column
 
     def test_create_table_fifth_column_styling_and_contents(self):
+        """Test the styling and contents of the fifth column."""
         expected_column = Column(
             header="Schedule\nType",
             footer="",
@@ -934,6 +967,7 @@ class TestDbAllRowsDisplayerCreateTable:
         assert actual_first_column == expected_column
 
     def test_create_table_sixth_column_styling_and_contents(self):
+        """Test the styling and contents of the sixth column."""
         expected_column = Column(
             header="Schedule\nValue",
             footer="",
@@ -955,6 +989,7 @@ class TestDbAllRowsDisplayerCreateTable:
         assert actual_first_column == expected_column
 
     def test_create_table_seventh_column_styling_and_contents(self):
+        """Test the styling and contents of the seventh column."""
         expected_column = Column(
             header="Status",
             footer="",
