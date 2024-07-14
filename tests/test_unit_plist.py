@@ -20,7 +20,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+import rich.box
 from launchd_me.plist import (
+    DbDisplayer,
     LaunchdMeInit,
     PlistCreator,
     PListDbConnectionManager,
@@ -32,9 +34,9 @@ from launchd_me.plist import (
     UserConfig,
 )
 from launchd_me.sql_statements import (
-    PLISTFILES_TABLE_INSERT_INTO,
     PLISTFILES_TABLE_SELECT_ALL,
 )
+from rich.table import Column, Row
 
 from tests.conftest import (
     ConfiguredEnvironmentObjects,
@@ -342,16 +344,16 @@ class TestPlistCreator:
         assert plc_interval.schedule_type == ScheduleType.interval
         assert plc_interval.schedule == 300
         assert plc_interval.description == "A description"
-        assert plc_interval.make_executable == True
-        assert plc_interval.auto_install == True
+        assert plc_interval.make_executable is True
+        assert plc_interval.auto_install is True
 
     def test_plist_creator_initialisation_with_calendar_schedule(self, plc_calendar):
         assert plc_calendar.path_to_script_to_automate == Path("calendar_task.py")
         assert plc_calendar.schedule_type == ScheduleType.calendar
         assert plc_calendar.schedule == {"Day": 15, "Hour": 15}
         assert plc_calendar.description == "A description"
-        assert plc_calendar.make_executable == True
-        assert plc_calendar.auto_install == True
+        assert plc_calendar.make_executable is True
+        assert plc_calendar.auto_install is True
 
     def test_generate_file_name(self, plc_interval):
         """Test file name generation.
@@ -745,4 +747,263 @@ class TestDbGetters:
         an error if the plist is not in the database.
         """
         with pytest.raises(PlistFileIDNotFound):
-            actual = self.dbg.get_a_single_plist_file_details(1)
+            self.dbg.get_a_single_plist_file_details(1)
+
+
+class TestDbDisplayer:
+    @pytest.fixture(autouse=True)
+    def setup_for_all_tests_in_class(self, mock_environment):
+        """Create a ``DbDisplayer`` instance and a formatted Table and pass them to all
+        tests in the class via ``self.db_displayer`` and ``self.actual_table``.
+
+        This fixture uses ``mock_environment`` to create an empty database. This fixture
+        then calls ``add_three_plist_file_entries_to_a_plist_files_table`` which
+        populates the newly created database with three rows of synthetic data.
+        """
+        add_three_plist_file_entries_to_a_plist_files_table(
+            mock_environment.user_config.ldm_db_file
+        )
+        connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT PlistFileID, PlistFileName, ScriptName, CreatedDate, "
+            "ScheduleType, ScheduleValue, CurrentState FROM PlistFiles"
+            " ORDER BY PlistFileID"
+        )
+        all_rows = cursor.fetchall()
+        self.db_displayer = DbDisplayer(mock_environment.user_config)
+        self.actual_table = self.db_displayer._create_table(all_rows)
+
+    def test_init(self):
+        """Sense check to ensure a DbDisplayer initialises as expected."""
+        assert self.db_displayer._user_config.user_name == "mock_user_name"
+
+    @pytest.mark.parametrize(
+        "iso_date_string, expected",
+        [
+            ("2024-07-15T12:34:56+09:00", "15-07-2024"),
+            ("2024-06-21T08:22:31-04:00", "21-06-2024"),
+            ("2024-09-10T17:45:12+01:00", "10-09-2024"),
+            ("2024-09-10T17:45:12Z", "10-09-2024"),
+        ],
+    )
+    def test_format_date(self, iso_date_string, expected):
+        """Test ``_format_date`` on a random selection of ISO formatted datetime
+        strings. ``_format_date`` expects valid ISO formatted strings.
+
+        Tests against a Z formatted datetime string. These are not natively supported by
+        ``datetime.fromisoformat`` before Python 3.11. The ``_format_date`` method
+        reformats Z formatted datetime strings.
+        """
+        actual = self.db_displayer._format_date(iso_date_string)
+        assert actual == expected
+
+    @pytest.mark.parametrize(
+        "xml_formatted_string, expected",
+        [
+            (
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '[grey69]<?xml version="1.0" encoding="UTF-8"?>[/grey69]',
+            ),
+            (
+                "<key>ProgramArguments</key>",
+                "[grey69]<key>[/grey69]ProgramArguments[grey69]</key>[/grey69]",
+            ),
+            ("<dict>", "[grey69]<dict>[/grey69]"),
+            ("</plist>", "[grey69]</plist>[/grey69]"),
+        ],
+    )
+    def test_style_xml_tags(self, xml_formatted_string, expected):
+        """Test ``style_xml_tags`` adds ``rich`` renderable formatting to any opening or
+        closing XML tag."""
+        actual = self.db_displayer._style_xml_tags(xml_formatted_string)
+        assert actual == expected
+
+    def test_table_displayer(self, mock_environment):
+        """Test ``_table_displayer`` which only passes the table to console output.
+        The test asserts that a console was created and that print was called on the
+        Console object with the expected values.
+        """
+        with patch("launchd_me.plist.Console") as MockConsole:
+            mock_console = MockConsole.return_value
+            dba = DbDisplayer(mock_environment.user_config)
+            dba._table_displayer("a_table_object")
+            MockConsole.assert_called_once()
+            mock_console.print.assert_called_once_with("\n", "a_table_object")
+
+    @pytest.mark.parametrize(
+        "attribute, expected_value",
+        [
+            ("box", rich.box.SIMPLE),
+            ("title", "  USER `mock_user_name` PERSONAL PLIST FILES"),
+            ("title_justify", "left"),
+            ("title_style", "blue3 bold italic"),
+            ("caption", "Run `ldm list <ID> for full plist file details."),
+            ("row_count", 3),
+            (
+                "rows",
+                [
+                    Row(style=None, end_section=False),
+                    Row(style=None, end_section=False),
+                    Row(style=None, end_section=False),
+                ],
+            ),
+        ],
+    )
+    def test_create_table_attributes(self, attribute, expected_value):
+        """Assert that a Table has the expected attributes (excluding columns)."""
+        assert getattr(self.actual_table, attribute) == expected_value
+
+    def test_create_table_first_column_styling_and_contents(self):
+        """Assert that a Table object has the expected column styling and attributes.
+        Each column is a Column objected and is tested individually in full.
+
+        Tests the styling and contents of the first column.
+        """
+        expected_first_column = Column(
+            header="File\nID",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="wrap",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=0,
+            _cells=["1", "2", "3"],
+        )
+        actual_first_column = self.actual_table.columns[0]
+        assert actual_first_column == expected_first_column
+
+    def test_create_table_second_column_styling_and_contents(self):
+        """Test the styling and contents of the second column."""
+        expected_column = Column(
+            header="Plist Filename",
+            justify="left",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=True,
+            _index=1,
+            _cells=["mock_plist_1", "mock_plist_2", "mock_plist_3"],
+        )
+        actual_first_column = self.actual_table.columns[1]
+        assert actual_first_column == expected_column
+
+    def test_create_table_third_column_styling_and_contents(self):
+        """Test the styling and contents of the third column."""
+        expected_column = Column(
+            header="Script Called",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="magenta",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=2,
+            _cells=["script_1", "script_2", "script_3"],
+        )
+        actual_first_column = self.actual_table.columns[2]
+        assert actual_first_column == expected_column
+
+    def test_create_table_fourth_column_styling_and_contents(self):
+        """Test the styling and contents of the fourth column."""
+        expected_column = Column(
+            header="Plist\nCreated",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=3,
+            _cells=["28-03-2024", "28-04-2024", "28-04-2024"],
+        )
+        actual_first_column = self.actual_table.columns[3]
+        assert actual_first_column == expected_column
+
+    def test_create_table_fifth_column_styling_and_contents(self):
+        """Test the styling and contents of the fifth column."""
+        expected_column = Column(
+            header="Schedule\nType",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=4,
+            _cells=["interval", "calendar", "interval"],
+        )
+        actual_first_column = self.actual_table.columns[4]
+        assert actual_first_column == expected_column
+
+    def test_create_table_sixth_column_styling_and_contents(self):
+        """Test the styling and contents of the sixth column."""
+        expected_column = Column(
+            header="Schedule\nValue",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=5,
+            _cells=["300", "{Hour: 15}", "1000"],
+        )
+        actual_first_column = self.actual_table.columns[5]
+        assert actual_first_column == expected_column
+
+    def test_create_table_seventh_column_styling_and_contents(self):
+        """Test the styling and contents of the seventh column."""
+        expected_column = Column(
+            header="Status",
+            footer="",
+            header_style="",
+            footer_style="",
+            style="",
+            justify="center",
+            vertical="top",
+            overflow="fold",
+            width=None,
+            min_width=None,
+            max_width=None,
+            ratio=None,
+            no_wrap=False,
+            _index=6,
+            _cells=["running", "running", "inactive"],
+        )
+        actual_first_column = self.actual_table.columns[6]
+        assert actual_first_column == expected_column

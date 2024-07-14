@@ -11,7 +11,7 @@ from typing import Dict, Union
 
 import rich
 from rich.console import Console
-from rich.table import Row, Table
+from rich.table import Table
 
 from launchd_me.logger_config import logger
 from launchd_me.sql_statements import PLISTFILES_TABLE_INSERT_INTO
@@ -112,7 +112,7 @@ class PListDbConnectionManager:
                     "Launchd-me directory not created. Ensure "
                     "LaunchdMeInit.initialise_launchd_me() is run first."
                 )
-            except FileNotFoundError as error:
+            except FileNotFoundError:
                 logging.exception("Application directory is missing.")
                 raise
         if not self.db_file.exists():
@@ -638,7 +638,6 @@ class PlistDbGetters:
         plist_detail: dict
             A dict of the plist file details in the format ``{'PlistFileID': 1,
             'PlistFileName': 'mock_plist_1' etc}``.
-
         """
         self.verify_a_plist_id_is_valid(plist_id)
         with PListDbConnectionManager(self._user_config) as cursor:
@@ -651,69 +650,34 @@ class PlistDbGetters:
         return plist_detail
 
 
-class DbDisplayerBase:
-    def __init__(self) -> None:
-        self._user_config = UserConfig()
-        self._db_getter = PlistDbGetters(self._user_config)
+class DbDisplayer:
+    """Display Plist data to the user."""
 
-    def _format_date(self, row: list):
-        """Reformats an ISO date as YYYY-MM-DD. Expects the ISO date at index 3."""
-        iso_date = datetime.fromisoformat(row[3])
-        formatted_date = iso_date.strftime("%d-%m-%Y")
-        row[3] = formatted_date
-        return row
+    def __init__(self, user_config: UserConfig) -> None:
+        """Initializer. ``user_config`` supplies the path to the database.
 
-    def _style_xml_tags(self, text_to_style):
-        re_pattern = r"<([^>]+)>"
-        matches = re.finditer(re_pattern, text_to_style)
-        last_end = 0
-        styled_text = ""
+        Parameters
+        ----------
+        user_config: UserConfig
+            A UserConfig object.
+        """
+        self._user_config = user_config
 
-        for match in matches:
-            start, end = match.span()
-            styled_text += text_to_style[last_end:start]
-            styled_text += f"[grey69]{text_to_style[start:end]}[/grey69]"
-            last_end = end
-        styled_text += text_to_style[last_end:]
-        return styled_text
+    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
+        """Public method to display PlistFile summary data in a table.
 
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
+            "PlistFileID" etc.
+        """
+        table = self._create_table(all_rows)
+        self._table_displayer(table)
 
-class DbAllRowsDisplayer(DbDisplayerBase):
-    def display_all_rows_table(self, all_rows) -> None:
-        console = Console()
-
-        table = self._create_table()
-        for row in all_rows:
-            row = list(row)
-            row = self._format_date(row)
-            table.add_row(*[str(item) for item in row])
-        print()  # Just to give an extra line for style.
-        console.print(table)
-
-    def _create_table(self) -> Table:
-        table = Table(box=rich.box.SIMPLE, show_header=True)
-        table.title = f"  USER `{self._user_config.user_name}` PERSONAL PLIST FILES"
-        table.caption = "Run `ldm list <ID> for full plist file details."
-        table.title_justify = "left"
-        table.title_style = "blue3 bold italic"
-        table.add_column("File\nID", justify="center", overflow="wrap")
-        table.add_column(
-            "Plist Filename", justify="center", overflow="fold", no_wrap=True
-        )
-        table.add_column(
-            "Script Called", justify="center", overflow="fold", style="magenta"
-        )
-        table.add_column("Plist\nCreated", justify="center", overflow="fold")
-        table.add_column("Schedule\nType", justify="center", overflow="fold")
-        table.add_column("Schedule\nValue", justify="center", overflow="fold")
-        table.add_column("Status", justify="center", overflow="fold")
-        return table
-
-
-class DbPlistDetailDisplayer(DbDisplayerBase):
-    """Display a detailed overview of a single plist file."""
-
-    def display_plist_detail(self, plist_detail: dict) -> None:
+    # TODO: Refactor once we actually have plist file contents in the db.
+    # Add type of `plist_detail`
+    def display_plist_detail(self, plist_detail) -> None:
         """Display a detailed overview of a single plist file.
 
         Note
@@ -722,8 +686,8 @@ class DbPlistDetailDisplayer(DbDisplayerBase):
 
         Parameters
         ----------
-        plist_detail
-
+        plist_detail:
+            #TODO: Confirm what type is.
         """
         console = Console()
         table = Table()
@@ -747,3 +711,89 @@ class DbPlistDetailDisplayer(DbDisplayerBase):
             table.add_row("", output)
         print()  # Just to give an extra line for style.
         console.print(table)
+
+    def _format_date(self, iso_datetime: str) -> str:
+        """Reformat a valid ISO datetime string as YYYY-MM-DD for display.
+
+        Notes
+        -----
+        Prior to Python 3.11, ``datetime.isoformat`` only supported ISO formats that
+        could be emitted by ``date.isoformat()`` or ``datetime.isoformat()``. The Z UTC
+        suffix format was not supported. To support earlier Python versions
+        ``_format_date`` replaces Z UTC suffixes with a UTC "+00:00" string.
+
+        For more see:
+        https://docs.python.org/3.11/library/datetime.html#datetime.datetime.fromisoformat
+
+        Parameters
+        ----------
+        iso_datetime: str
+            A valid ISO datetime.
+        """
+        if iso_datetime.endswith("Z"):
+            iso_datetime = iso_datetime.replace("Z", "+00:00")
+        iso_datetime = datetime.fromisoformat(iso_datetime)
+        formatted_date = iso_datetime.strftime("%d-%m-%Y")
+        return formatted_date
+
+    def _style_xml_tags(self, text_to_style: str) -> str:
+        """Add Rich styling to any XML opening/closing tags in a string."""
+        re_pattern = r"<([^>]+)>"
+        matches = re.finditer(re_pattern, text_to_style)
+        last_end = 0
+        styled_text = ""
+
+        for match in matches:
+            start, end = match.span()
+            styled_text += text_to_style[last_end:start]
+            styled_text += f"[grey69]{text_to_style[start:end]}[/grey69]"
+            last_end = end
+        styled_text += text_to_style[last_end:]
+        return styled_text
+
+    def _table_displayer(self, table: Table) -> None:
+        """Print a table to the console. Isolated for easy testing.
+
+        Parameters
+        ----------
+        table: Table
+            A rich Table object.
+        """
+        console = Console()
+        console.print("\n", table)
+
+    def _create_table(self, all_rows) -> Table:
+        """Create a formatted `rich` Table to display rows of PlistFile data.
+
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
+            "PlistFileID" etc.
+
+        Returns
+        -------
+        table: Table
+            A formatted `rich` table containing the ``all_rows`` data.
+        """
+        table = Table(box=rich.box.SIMPLE, show_header=True)
+        table.title = f"  USER `{self._user_config.user_name}` PERSONAL PLIST FILES"
+        table.caption = "Run `ldm list <ID> for full plist file details."
+        table.title_justify = "left"
+        table.title_style = "blue3 bold italic"
+        table.add_column("File\nID", justify="center", overflow="wrap")
+        table.add_column(
+            "Plist Filename", justify="left", overflow="fold", no_wrap=True
+        )
+        table.add_column(
+            "Script Called", justify="center", overflow="fold", style="magenta"
+        )
+        table.add_column("Plist\nCreated", justify="center", overflow="fold")
+        table.add_column("Schedule\nType", justify="center", overflow="fold")
+        table.add_column("Schedule\nValue", justify="center", overflow="fold")
+        table.add_column("Status", justify="center", overflow="fold")
+        for row in all_rows:
+            row = list(row)
+            row[3] = self._format_date(row[3])
+            table.add_row(*[str(item) for item in row])
+        return table

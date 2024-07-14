@@ -4,15 +4,13 @@ from pathlib import Path
 
 from launchd_me.logger_config import logger
 from launchd_me.plist import (
-    DbAllRowsDisplayer,
-    DbPlistDetailDisplayer,
+    DbDisplayer,
     LaunchdMeInit,
     PlistCreator,
     PlistDbGetters,
     PlistDbSetters,
     PlistFileIDNotFound,
     PlistInstallationManager,
-    ScheduleType,
     UserConfig,
 )
 
@@ -96,6 +94,7 @@ def get_args():
         help="Delete the current db and plist directory. NOTE: Currently does not "
         "unload or delete existing plist symlinks.",
     )
+    parser_reset.add_argument("reset")
 
     args = parser.parse_args()
     return args
@@ -123,13 +122,14 @@ def create_plist(args):
 def list_plists(args):
     db_getters = PlistDbGetters(USER_CONFIG)
     if args.plist_id:
-        db_plist_displayer = DbPlistDetailDisplayer()
+        logger.debug("Displaying a single plist file detail.")
+        db_displayer = DbDisplayer(USER_CONFIG)
         row = db_getters.get_a_single_plist_file_details(args.plist_id)
-        db_plist_displayer.display_plist_detail(row)
+        db_displayer.display_plist_detail(row)
     else:
-        logger.debug("Calling 'display_all_tracked_plist_files().")
+        logger.debug("Displaying all plist files.")
         all_rows = db_getters.get_all_tracked_plist_files()
-        db_all_rows_displayer = DbAllRowsDisplayer()
+        db_all_rows_displayer = DbDisplayer(USER_CONFIG)
         db_all_rows_displayer.display_all_rows_table(all_rows)
 
 
@@ -168,9 +168,8 @@ def uninstall_plist(args: argparse.Namespace) -> None:
 
 
 def reset_user(args: argparse.Namespace):
-    user_conf = UserConfig()
     logger.debug("Fetching the project directory")
-    project_dir = user_conf.project_dir
+    project_dir = USER_CONFIG.project_dir
     logger.debug(f"Project directory: {project_dir}")
     logger.debug(f"Deleting: {project_dir}")
     shutil.rmtree(project_dir)
