@@ -11,7 +11,6 @@ from launchd_me.plist import (
     PlistDbSetters,
     PlistFileIDNotFound,
     PlistInstallationManager,
-    ScheduleType,
     UserConfig,
 )
 
@@ -95,6 +94,7 @@ def get_args():
         help="Delete the current db and plist directory. NOTE: Currently does not "
         "unload or delete existing plist symlinks.",
     )
+    parser_reset.add_argument("reset")
 
     args = parser.parse_args()
     return args
@@ -168,9 +168,8 @@ def uninstall_plist(args: argparse.Namespace) -> None:
 
 
 def reset_user(args: argparse.Namespace):
-    user_conf = UserConfig()
     logger.debug("Fetching the project directory")
-    project_dir = user_conf.project_dir
+    project_dir = USER_CONFIG.project_dir
     logger.debug(f"Project directory: {project_dir}")
     logger.debug(f"Deleting: {project_dir}")
     shutil.rmtree(project_dir)

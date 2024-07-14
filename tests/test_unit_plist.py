@@ -17,7 +17,6 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
-from unittest import mock
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -35,10 +34,9 @@ from launchd_me.plist import (
     UserConfig,
 )
 from launchd_me.sql_statements import (
-    PLISTFILES_TABLE_INSERT_INTO,
     PLISTFILES_TABLE_SELECT_ALL,
 )
-from rich.table import Column, Row, Table
+from rich.table import Column, Row
 
 from tests.conftest import (
     ConfiguredEnvironmentObjects,
@@ -346,16 +344,16 @@ class TestPlistCreator:
         assert plc_interval.schedule_type == ScheduleType.interval
         assert plc_interval.schedule == 300
         assert plc_interval.description == "A description"
-        assert plc_interval.make_executable == True
-        assert plc_interval.auto_install == True
+        assert plc_interval.make_executable is True
+        assert plc_interval.auto_install is True
 
     def test_plist_creator_initialisation_with_calendar_schedule(self, plc_calendar):
         assert plc_calendar.path_to_script_to_automate == Path("calendar_task.py")
         assert plc_calendar.schedule_type == ScheduleType.calendar
         assert plc_calendar.schedule == {"Day": 15, "Hour": 15}
         assert plc_calendar.description == "A description"
-        assert plc_calendar.make_executable == True
-        assert plc_calendar.auto_install == True
+        assert plc_calendar.make_executable is True
+        assert plc_calendar.auto_install is True
 
     def test_generate_file_name(self, plc_interval):
         """Test file name generation.
@@ -749,7 +747,7 @@ class TestDbGetters:
         an error if the plist is not in the database.
         """
         with pytest.raises(PlistFileIDNotFound):
-            actual = self.dbg.get_a_single_plist_file_details(1)
+            self.dbg.get_a_single_plist_file_details(1)
 
 
 class TestDbDisplayer:

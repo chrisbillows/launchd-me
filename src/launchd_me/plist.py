@@ -11,7 +11,7 @@ from typing import Dict, Union
 
 import rich
 from rich.console import Console
-from rich.table import Row, Table
+from rich.table import Table
 
 from launchd_me.logger_config import logger
 from launchd_me.sql_statements import PLISTFILES_TABLE_INSERT_INTO
@@ -112,7 +112,7 @@ class PListDbConnectionManager:
                     "Launchd-me directory not created. Ensure "
                     "LaunchdMeInit.initialise_launchd_me() is run first."
                 )
-            except FileNotFoundError as error:
+            except FileNotFoundError:
                 logging.exception("Application directory is missing.")
                 raise
         if not self.db_file.exists():

@@ -64,14 +64,6 @@ class TestTheMockEnvironmentFixture:
     def test_mock_environment_paths_to_system_directory_directories(self):
         """Test required system directory paths are correct."""
         user_config = self.mock_environment.user_config
-        temp_user_dir = self.mock_environment.tmp_dir
-        assert user_config.launch_agents_dir == temp_user_dir.joinpath(
-            "Library/LaunchAgents"
-        )
-
-    def test_mock_environment_paths_to_system_directory_directories(self):
-        """Test required system directory paths exist as expected."""
-        user_config = self.mock_environment.user_config
         temp_user_dir = self.mock_environment.temp_user_dir
         assert user_config.launch_agents_dir == temp_user_dir.joinpath(
             "Library/LaunchAgents"
