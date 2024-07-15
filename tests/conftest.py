@@ -81,6 +81,7 @@ def add_three_plist_file_entries_to_a_plist_files_table(ldm_db_file_path: Path) 
             300,
             "running",
             "Mock plist file number 1",
+            "<plist>\n<dict>\n<string>placeholder_content</string>\n</dict>\n</plist>",
         ),
         (
             "mock_plist_2",
@@ -90,6 +91,7 @@ def add_three_plist_file_entries_to_a_plist_files_table(ldm_db_file_path: Path) 
             "{Hour: 15}",
             "running",
             "Mock plist file number 2",
+            "<plist>\n<dict>\n<string>placeholder_content</string>\n</dict>\n</plist>",
         ),
         (
             "mock_plist_3",
@@ -99,6 +101,7 @@ def add_three_plist_file_entries_to_a_plist_files_table(ldm_db_file_path: Path) 
             1000,
             "inactive",
             "Mock plist file number 3",
+            "<plist>\n<dict>\n<string>placeholder_content</string>\n</dict>\n</plist>",
         ),
     )
     connection = sqlite3.connect(ldm_db_file_path)
@@ -115,6 +118,7 @@ def add_three_plist_file_entries_to_a_plist_files_table(ldm_db_file_path: Path) 
                 plist_file[4],
                 plist_file[5],
                 plist_file[6],
+                plist_file[7],
             ),
         )
     connection.commit()
