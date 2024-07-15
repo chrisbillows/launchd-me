@@ -94,8 +94,6 @@ def get_args():
         help="Delete the current db and plist directory. NOTE: Currently does not "
         "unload or delete existing plist symlinks.",
     )
-    parser_reset.add_argument("reset")
-
     args = parser.parse_args()
     return args
 

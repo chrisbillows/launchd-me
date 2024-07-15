@@ -92,6 +92,7 @@ class TestPlistDBConnectionManager:
         {"name": "ScheduleValue", "type": "TEXT"},
         {"name": "CurrentState", "type": "TEXT"},
         {"name": "Description", "type": "TEXT"},
+        {"name": "PlistFileContent", "type": "TEXT"},
     ]
 
     EXPECTED_COLUMNS_INSTALLATION_EVENTS = [
@@ -508,6 +509,7 @@ class TestDBSetters:
             "a schedule_type",
             "a schedule_value",
             "a description",
+            "plist file content",
         )
         connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
         cursor = connection.cursor()
@@ -524,6 +526,7 @@ class TestDBSetters:
                 "a schedule_value",
                 "inactive",
                 "a description",
+                "plist file content",
             )
         ]
         assert actual[0][0:3] == expected[0][0:3]
@@ -727,6 +730,7 @@ class TestDbGetters:
             "ScheduleValue": "300",
             "CurrentState": "running",
             "Description": "Mock plist file number 1",
+            "PlistFileContent": "<plist>\n<dict>\n<string>placeholder_content</string>\n</dict>\n</plist>",
         }
         assert actual == expected
 

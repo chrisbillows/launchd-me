@@ -14,7 +14,11 @@ from rich.console import Console
 from rich.table import Table
 
 from launchd_me.logger_config import logger
-from launchd_me.sql_statements import PLISTFILES_TABLE_INSERT_INTO
+from launchd_me.sql_statements import (
+    CREATE_TABLE_INSTALLATION_EVENTS,
+    CREATE_TABLE_PLIST_FILES,
+    PLISTFILES_TABLE_INSERT_INTO,
+)
 
 
 class ScheduleType(str, Enum):
@@ -77,31 +81,6 @@ class PListDbConnectionManager:
     FileNotFoundError:
         If the launchd-me directory doesn't exist and informs the developer that
         launchd-me init must run first.
-
-    """
-
-    CREATE_TABLE_PLIST_FILES = """
-    CREATE TABLE IF NOT EXISTS PlistFiles (
-        PlistFileID INTEGER PRIMARY KEY AUTOINCREMENT,
-        PlistFileName TEXT NOT NULL,
-        ScriptName TEXT NOT NULL,
-        CreatedDate TEXT NOT NULL,
-        ScheduleType TEXT NOT NULL,
-        ScheduleValue TEXT,
-        CurrentState TEXT NOT NULL CHECK (CurrentState IN ('running', 'inactive', 'deleted')),
-        Description TEXT
-    );
-    """
-
-    CREATE_TABLE_INSTALLATION_EVENTS = """
-    CREATE TABLE IF NOT EXISTS InstallationEvents (
-        EventID INTEGER PRIMARY KEY AUTOINCREMENT,
-        FileID INTEGER,
-        EventType TEXT NOT NULL CHECK (EventType IN ('install', 'uninstall')),
-        EventDate TEXT NOT NULL,
-        Success INTEGER NOT NULL CHECK (Success IN (0, 1)), -- 0 = False, 1 = True
-        FOREIGN KEY (FileID) REFERENCES PlistFiles (FileID)
-    );
     """
 
     def __init__(self, user_config: UserConfig):
@@ -140,8 +119,8 @@ class PListDbConnectionManager:
         with sqlite3.connect(self.db_file) as connection:
             logger.debug("Creating database.")
             cursor = connection.cursor()
-            cursor.execute(self.CREATE_TABLE_PLIST_FILES)
-            cursor.execute(self.CREATE_TABLE_INSTALLATION_EVENTS)
+            cursor.execute(CREATE_TABLE_PLIST_FILES)
+            cursor.execute(CREATE_TABLE_INSTALLATION_EVENTS)
             connection.commit()
             logger.debug("Database created.")
 
@@ -266,7 +245,6 @@ class PlistCreator:
         db_setter : PlistDBSetters
             Interface to update the database when plist creation occurs.
         """
-
         self.path_to_script_to_automate = path_to_script_to_automate
         self.schedule_type = schedule_type
         self.schedule = schedule
@@ -300,6 +278,7 @@ class PlistCreator:
             self.schedule_type,
             self.schedule,
             self.description,
+            plist_content,
         )
         if self.make_executable:
             self._make_script_executable()
@@ -460,7 +439,13 @@ class PlistDbSetters:
         self.user_config = user_config
 
     def add_newly_created_plist_file(
-        self, plist_filename, script_name, schedule_type, schedule_value, description
+        self,
+        plist_filename,
+        script_name,
+        schedule_type,
+        schedule_value,
+        description,
+        plist_file_contents,
     ):
         now = datetime.now().isoformat()
         logger.debug("Adding new plist file to database.")
@@ -475,6 +460,7 @@ class PlistDbSetters:
                     schedule_value,
                     "inactive",
                     description,
+                    plist_file_contents,
                 ),
             )
         return cursor.lastrowid
