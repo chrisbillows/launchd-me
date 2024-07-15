@@ -649,7 +649,7 @@ class DbDisplayer:
         """
         self._user_config = user_config
 
-    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
+    def display_all_tracked_plist_files_table(self, all_rows: list[tuple]) -> None:
         """Public method to display PlistFile summary data in a table.
 
         Parameters
@@ -658,45 +658,99 @@ class DbDisplayer:
             A list of all database rows as tuples, where tuple[0] =
             "PlistFileID" etc.
         """
-        table = self._create_table(all_rows)
+        table = self._create_all_tracked_plist_files_table(all_rows)
         self._table_displayer(table)
 
-    # TODO: Refactor once we actually have plist file contents in the db.
-    # Add type of `plist_detail`
-    def display_plist_detail(self, plist_detail) -> None:
+    def display_single_plist_file_detail_table(self, plist_detail: dict) -> None:
         """Display a detailed overview of a single plist file.
-
-        Note
-        ----
-        This is currently hardcoded to display the plist file content for every plist.
 
         Parameters
         ----------
-        plist_detail:
-            #TODO: Confirm what type is.
+        plist_detail: dict
+            A dictionary of data about a tracked plist file in the format:
+            { 'PlistFileID': <id>, 'PlistFileName': <name>, ... }.
+        """
+        table = self._create_single_plist_file_detail_table(plist_detail)
+        self._table_displayer(table)
+
+    def _table_displayer(self, table: Table) -> None:
+        """Print a table to the console. Isolated for easy testing.
+
+        Parameters
+        ----------
+        table: Table
+            A rich Table object.
         """
         console = Console()
+        console.print("\n", table)
+
+    def _create_single_plist_file_detail_table(self, plist_detail: dict) -> Table:
+        """Create a formatted `rich` Table to display details of a single plist file.
+
+        Parameters
+        ----------
+        plist_detail: dict
+            A dictionary of data about a tracked plist file in the format:
+            { 'PlistFileID': <id>, 'PlistFileName': <name>, ... }.
+
+        Returns
+        -------
+        table: Table
+            A formatted `rich` table containing the ``plist_detail`` data.
+        """
         table = Table()
         table.add_column("Plist File")
         table.add_column("Details")
+        # TODO: Is a loop the best way to do this? Test currently all run.
         for field_name, value in plist_detail.items():
             if isinstance(value, int):
                 value = str(value)
-            if field_name == "ScriptName":
+            elif field_name == "ScriptName":
                 table.add_row(field_name, value, style="magenta")
+            elif field_name == "PlistFileContent":
+                table.add_row("________________", "________________")
+                output = self._style_xml_tags(value)
+                table.add_row("\nPlistFileContent", "\n" + output)
             else:
                 table.add_row(field_name, value)
-        file = "/Users/chrisbillows/launchd-me/plist_files/local.chrisbillows.whole_new_name_0001.plist"
-        table.add_row("________________", "________________")
-        table.add_row("PlistFileContent", "")
-        with open(file, "r") as file_handle:
-            contents = file_handle.readlines()
-        for line in contents:
-            output = line.replace("\n", "")
-            output = self._style_xml_tags(output)
-            table.add_row("", output)
-        print()  # Just to give an extra line for style.
-        console.print(table)
+        return table
+
+    def _create_all_tracked_plist_files_table(self, all_rows) -> Table:
+        """Create a formatted `rich` Table to display rows of PlistFile data.
+
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] =
+            "PlistFileID" etc.
+
+        Returns
+        -------
+        table: Table
+            A formatted `rich` table containing the ``all_rows`` data.
+        """
+        table = Table(box=rich.box.SIMPLE, show_header=True)
+        table.title = f"  USER `{self._user_config.user_name}` PERSONAL PLIST FILES"
+        table.caption = "Run `ldm list <ID> for full plist file details."
+        table.title_justify = "left"
+        table.title_style = "blue3 bold italic"
+        table.add_column("File\nID", justify="center", overflow="wrap")
+        table.add_column(
+            "Plist Filename", justify="left", overflow="fold", no_wrap=True
+        )
+        table.add_column(
+            "Script Called", justify="center", overflow="fold", style="magenta"
+        )
+        table.add_column("Plist\nCreated", justify="center", overflow="fold")
+        table.add_column("Schedule\nType", justify="center", overflow="fold")
+        table.add_column("Schedule\nValue", justify="center", overflow="fold")
+        table.add_column("Status", justify="center", overflow="fold")
+        # TODO: Fix this in v0.1.0 tidy up sweep.
+        for row in all_rows:
+            row = list(row)
+            row[3] = self._format_date(row[3])
+            table.add_row(*[str(item) for item in row])
+        return table
 
     def _format_date(self, iso_datetime: str) -> str:
         """Reformat a valid ISO datetime string as YYYY-MM-DD for display.
@@ -728,7 +782,6 @@ class DbDisplayer:
         matches = re.finditer(re_pattern, text_to_style)
         last_end = 0
         styled_text = ""
-
         for match in matches:
             start, end = match.span()
             styled_text += text_to_style[last_end:start]
@@ -736,50 +789,3 @@ class DbDisplayer:
             last_end = end
         styled_text += text_to_style[last_end:]
         return styled_text
-
-    def _table_displayer(self, table: Table) -> None:
-        """Print a table to the console. Isolated for easy testing.
-
-        Parameters
-        ----------
-        table: Table
-            A rich Table object.
-        """
-        console = Console()
-        console.print("\n", table)
-
-    def _create_table(self, all_rows) -> Table:
-        """Create a formatted `rich` Table to display rows of PlistFile data.
-
-        Parameters
-        ----------
-        all_rows: list[tuple]
-            A list of all database rows as tuples, where tuple[0] =
-            "PlistFileID" etc.
-
-        Returns
-        -------
-        table: Table
-            A formatted `rich` table containing the ``all_rows`` data.
-        """
-        table = Table(box=rich.box.SIMPLE, show_header=True)
-        table.title = f"  USER `{self._user_config.user_name}` PERSONAL PLIST FILES"
-        table.caption = "Run `ldm list <ID> for full plist file details."
-        table.title_justify = "left"
-        table.title_style = "blue3 bold italic"
-        table.add_column("File\nID", justify="center", overflow="wrap")
-        table.add_column(
-            "Plist Filename", justify="left", overflow="fold", no_wrap=True
-        )
-        table.add_column(
-            "Script Called", justify="center", overflow="fold", style="magenta"
-        )
-        table.add_column("Plist\nCreated", justify="center", overflow="fold")
-        table.add_column("Schedule\nType", justify="center", overflow="fold")
-        table.add_column("Schedule\nValue", justify="center", overflow="fold")
-        table.add_column("Status", justify="center", overflow="fold")
-        for row in all_rows:
-            row = list(row)
-            row[3] = self._format_date(row[3])
-            table.add_row(*[str(item) for item in row])
-        return table

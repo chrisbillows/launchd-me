@@ -776,7 +776,9 @@ class TestDbDisplayer:
         )
         all_rows = cursor.fetchall()
         self.db_displayer = DbDisplayer(mock_environment.user_config)
-        self.actual_table = self.db_displayer._create_table(all_rows)
+        self.actual_table = self.db_displayer._create_all_tracked_plist_files_table(
+            all_rows
+        )
 
     def test_init(self):
         """Sense check to ensure a DbDisplayer initialises as expected."""
