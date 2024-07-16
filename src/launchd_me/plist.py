@@ -18,6 +18,7 @@ from launchd_me.sql_statements import (
     CREATE_TABLE_INSTALLATION_EVENTS,
     CREATE_TABLE_PLIST_FILES,
     PLISTFILES_TABLE_INSERT_INTO,
+    PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE,
 )
 
 
@@ -627,9 +628,7 @@ class PlistDbGetters:
         """
         self.verify_a_plist_id_is_valid(plist_id)
         with PListDbConnectionManager(self._user_config) as cursor:
-            cursor.execute(
-                "SELECT * FROM  PlistFiles WHERE plistFileId = ?", (plist_id,)
-            )
+            cursor.execute(PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE, (plist_id,))
             target_row = cursor.fetchall()
             description = [description[0] for description in cursor.description]
         plist_detail = dict(zip(description, target_row[0]))
@@ -687,6 +686,14 @@ class DbDisplayer:
     def _create_single_plist_file_detail_table(self, plist_detail: dict) -> Table:
         """Create a formatted `rich` Table to display details of a single plist file.
 
+        Every item in plist_detail is added as a row. Row styling can be added by adding
+        a style to the ``row_styling`` dict. A value can be formatted for display by
+        adding a ``formatter`` callable to ``value_formatters``. Note: aAll values are
+        cast to the table as strings. ``Rich`` cannot display ints, for example.
+
+        ``PlistFileContent`` is displayed in a separate section created with additional
+        rows.
+
         Parameters
         ----------
         plist_detail: dict
@@ -698,21 +705,23 @@ class DbDisplayer:
         table: Table
             A formatted `rich` table containing the ``plist_detail`` data.
         """
+        VALUE_FORMATTERS = {
+            "PlistFileId": str,
+            "CreatedDate": self._format_date,
+            "PlistFileContent": self._style_xml_tags,
+        }
+        ROW_STYLING = {"ScriptName": "magenta"}
         table = Table()
         table.add_column("Plist File")
         table.add_column("Details")
-        # TODO: Is a loop the best way to do this? Test currently all run.
         for field_name, value in plist_detail.items():
-            if isinstance(value, int):
-                value = str(value)
-            elif field_name == "ScriptName":
-                table.add_row(field_name, value, style="magenta")
-            elif field_name == "PlistFileContent":
+            style = ROW_STYLING.get(field_name, None)
+            if field_name in VALUE_FORMATTERS:
+                value = VALUE_FORMATTERS[field_name](value)
+            if field_name == "PlistFileContent":
                 table.add_row("________________", "________________")
-                output = self._style_xml_tags(value)
-                table.add_row("\nPlistFileContent", "\n" + output)
-            else:
-                table.add_row(field_name, value)
+                table.add_row("", "")
+            table.add_row(field_name, str(value), style=style)
         return table
 
     def _create_all_tracked_plist_files_table(self, all_rows) -> Table:
