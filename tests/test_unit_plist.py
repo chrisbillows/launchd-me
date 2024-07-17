@@ -377,7 +377,7 @@ class TestPlistCreator:
     def test_write_file_and_make_script_executable(self, plc_interval, tmp_path):
         """Test writing mock content to a mock file.
 
-        Creates an empty mock file, writes content to it then makes it an exectuable.
+        Creates an empty mock file, writes content to it then makes it an executable.
         """
         mock_file = tmp_path / "mock_file"
         mock_content = "123\n456\n789"
@@ -762,13 +762,15 @@ class TestDbDisplayer:
     @pytest.mark.parametrize(
         "iso_date_string, expected",
         [
-            ("2024-07-15T12:34:56+09:00", "15-07-2024"),
-            ("2024-06-21T08:22:31-04:00", "21-06-2024"),
-            ("2024-09-10T17:45:12+01:00", "10-09-2024"),
-            ("2024-09-10T17:45:12Z", "10-09-2024"),
+            ("2024-07-15T12:34:56+09:00", "2024-07-15"),
+            ("2024-06-21T08:22:31-04:00", "2024-06-21"),
+            ("2024-09-10T17:45:12+01:00", "2024-09-10"),
+            ("2024-09-10T17:45:12Z", "2024-09-10"),
         ],
     )
-    def test_format_date(self, iso_date_string, expected, mock_environment):
+    def test_format_date_with_various_iso_formats(
+        self, iso_date_string, expected, mock_environment
+    ):
         """Test ``_format_date`` on a random selection of ISO formatted datetime
         strings. ``_format_date`` expects valid ISO formatted strings.
 
@@ -795,15 +797,18 @@ class TestDbDisplayer:
             ("</plist>", "[grey69]</plist>[/grey69]"),
         ],
     )
-    def test_style_xml_tags(self, xml_formatted_string, expected, mock_environment):
-        """Test ``style_xml_tags`` adds ``rich`` renderable formatting to any opening or
-        closing XML tag."""
+    def test_style_xml_tags_with_various_xml_strings(
+        self, xml_formatted_string, expected, mock_environment
+    ):
+        """Test ``_style_xml_tags`` adds ``rich`` renderable formatting to any opening
+        or closing XML tag."""
         db_displayer = DbDisplayer(mock_environment.user_config)
         actual = db_displayer._style_xml_tags(xml_formatted_string)
         assert actual == expected
 
-    def test_table_displayer(self, mock_environment):
-        """Test ``_table_displayer`` which only passes the table to console output.
+    def test_table_displayer_creates_console_output(self, mock_environment):
+        """Test ``_table_displayer`` which passes the table to console output.
+
         The test asserts that a console was created and that print was called on the
         Console object with the expected values.
         """
@@ -818,16 +823,16 @@ class TestDbDisplayer:
 class TestDbDisplayerSinglePlistFileDetailTable:
     @pytest.fixture(autouse=True)
     def setup_for_all_tests_in_class(self, mock_environment):
-        """
-        Create a ``DbDisplayer`` instance and a formatted Table and pass them to all
-        tests in the class via ``self.db_displayer`` and
+        """Create a ``DbDisplayer`` instance and a formatted Table for all tests.
+
+        They are accessible in all tests in the class via ``self.db_displayer`` and
         ``self.actual_single_plist_table``.
 
-        This fixture uses ``mock_environment`` to create an empty database. This fixture
-        then calls ``add_three_plist_file_entries_to_a_plist_files_table`` which
-        populates the newly created database with three rows of synthetic data.
+        This fixture uses ``mock_environment`` to create an empty database and populates
+        it with three rows of synthetic data using
+        ``add_three_plist_file_entries_to_a_plist_files_table``.
 
-        A connection is manually created to fetch ``target_row``, which is then
+        A connection is manually created to retrieve ``target_row``, which is then
         formatted as the method under test expects. The SQLite command is the same used
         by the ``DbGetter`` method that normally supplies the data.
         """
@@ -845,7 +850,7 @@ class TestDbDisplayerSinglePlistFileDetailTable:
             self.db_displayer._create_single_plist_file_detail_table(plist_detail)
         )
 
-    def test_init(self):
+    def test_init_initializes_db_displayer_correctly(self):
         """Sense check to ensure a DbDisplayer initialises as expected."""
         assert self.db_displayer._user_config.user_name == "mock_user_name"
 
@@ -888,18 +893,18 @@ class TestDbDisplayerSinglePlistFileDetailTable:
                 continue
             assert actual_value == expected
 
-    def test_create_single_plist_file_detail_table_row_count(self):
+    def test_create_single_plist_file_detail_table_has_correct_row_count(self):
         """Test the expected number of rows in the table"""
         assert self.actual_single_plist_table.row_count == 11
 
-    def test_create_single_plist_file_detail_table_rows(self):
+    def test_create_single_plist_file_detail_table_has_correct_rows(self):
         """Test the row object attributes. Only one row has different styling."""
         magenta_row = Row(style="magenta", end_section=False)
         expected_rows = [Row(style=None, end_section=False) for num in range(11)]
         expected_rows[2] = magenta_row
         assert self.actual_single_plist_table.rows == expected_rows
 
-    def create_expected_columns(self):
+    def create_expected_columns_for_single_plist_file_detail_table(self):
         """Helper function to create expected columns."""
         cells_column_1 = [
             "PlistFileID",
@@ -918,7 +923,7 @@ class TestDbDisplayerSinglePlistFileDetailTable:
             "1",
             "mock_plist_1",
             "script_1",
-            "28-03-2024",
+            "2024-03-28",
             "interval",
             "300",
             "running",
@@ -963,26 +968,27 @@ class TestDbDisplayerSinglePlistFileDetailTable:
         )
         return [column_1, column_2]
 
-    def test_create_single_plist_file_detail_table_columns(self):
+    def test_create_single_plist_file_detail_table_has_correct_columns(self):
         """Test columns attribute in its entirety as this is the vital output of the
         method.
         """
-        expected = self.create_expected_columns()
+        expected = self.create_expected_columns_for_single_plist_file_detail_table()
         assert self.actual_single_plist_table.columns == expected
 
 
 class TestDbDisplayerAllTrackedPlistFilesTable:
     @pytest.fixture(autouse=True)
     def setup_for_all_tests_in_class(self, mock_environment):
-        """Create a ``DbDisplayer`` instance and a formatted Table and pass them to all
-        tests in the class via ``self.db_displayer`` and
-        ``self.actual_all_tracked_table``.
+        """Create a ``DbDisplayer`` instance and a formatted Table for all tests.
 
-        This fixture uses ``mock_environment`` to create an empty database. This fixture
-        then calls ``add_three_plist_file_entries_to_a_plist_files_table`` which
-        populates the newly created database with three rows of synthetic data.
+        They are accessible in all tests in the class via ``self.db_displayer`` and
+        ``self.actual_single_plist_table``.
 
-        A connection is manually created to fetch all the data as ``all_rows``.
+        This fixture uses ``mock_environment`` to create an empty database and populates
+        it with three rows of synthetic data using
+        ``add_three_plist_file_entries_to_a_plist_files_table``.
+
+        A connection is manually created to retrieve all the data as ``all_rows``.
         The SQLite command is the same used by the ``DbGetter`` method that normally
         supplies the data.
         """
@@ -998,7 +1004,7 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
             self.db_displayer._create_all_tracked_plist_files_table(all_rows)
         )
 
-    def test_init(self):
+    def test_init_initializes_db_displayer_correctly(self):
         """Sense check to ensure a DbDisplayer initialises as expected."""
         assert self.db_displayer._user_config.user_name == "mock_user_name"
 
@@ -1009,18 +1015,18 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
             ("title", "  USER `mock_user_name` PERSONAL PLIST FILES"),
             ("title_justify", "left"),
             ("title_style", "blue3 bold italic"),
-            ("caption", "Run `ldm list <ID> for full plist file details."),
+            ("caption", "Run `ldm list <ID>` for full plist file details."),
             ("row_count", 3),
             ("rows", [Row(style=None, end_section=False) for num in range(3)]),
         ],
     )
-    def test_create_all_tracked_plist_files_table_attributes(
+    def test_create_all_tracked_plist_files_table_has_expected_attributes(
         self, attribute, expected_value
     ):
         """Assert that a Table has the expected attributes (excluding columns)."""
         assert getattr(self.actual_all_tracked_table, attribute) == expected_value
 
-    def test_create_all_tracked_plist_files_table_first_column(self):
+    def test_create_all_tracked_plist_files_table_first_column_attributes(self):
         """Assert that a Table object has the expected column styling and attributes.
         Each column is a Column objected and is tested individually in full.
 
@@ -1046,7 +1052,7 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
         actual_first_column = self.actual_all_tracked_table.columns[0]
         assert actual_first_column == expected_first_column
 
-    def test_create_all_tracked_plist_files_table_second_column(self):
+    def test_create_all_tracked_plist_files_table_second_column_attributes(self):
         """Test the styling and contents of the second column."""
         expected_column = Column(
             header="Plist Filename",
@@ -1064,7 +1070,7 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
         actual_first_column = self.actual_all_tracked_table.columns[1]
         assert actual_first_column == expected_column
 
-    def test_create_all_tracked_plist_files_table_third_column(self):
+    def test_create_all_tracked_plist_files_table_third_column_attributes(self):
         """Test the styling and contents of the third column."""
         expected_column = Column(
             header="Script Called",
@@ -1086,7 +1092,7 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
         actual_first_column = self.actual_all_tracked_table.columns[2]
         assert actual_first_column == expected_column
 
-    def test_create_all_tracked_plist_files_table_fourth_column(self):
+    def test_create_all_tracked_plist_files_table_fourth_column_attributes(self):
         """Test the styling and contents of the fourth column."""
         expected_column = Column(
             header="Plist\nCreated",
@@ -1103,12 +1109,12 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
             ratio=None,
             no_wrap=False,
             _index=3,
-            _cells=["28-03-2024", "28-04-2024", "28-04-2024"],
+            _cells=["2024-03-28", "2024-04-28", "2024-04-28"],
         )
         actual_first_column = self.actual_all_tracked_table.columns[3]
         assert actual_first_column == expected_column
 
-    def test_create_all_tracked_plist_files_table_fifth_column(self):
+    def test_create_all_tracked_plist_files_table_fifth_column_attributes(self):
         """Test the styling and contents of the fifth column."""
         expected_column = Column(
             header="Schedule\nType",
@@ -1130,7 +1136,7 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
         actual_first_column = self.actual_all_tracked_table.columns[4]
         assert actual_first_column == expected_column
 
-    def test_create_all_tracked_plist_files_table_sixth_column(self):
+    def test_create_all_tracked_plist_files_table_sixth_column_attributes(self):
         """Test the styling and contents of the sixth column."""
         expected_column = Column(
             header="Schedule\nValue",
@@ -1152,7 +1158,7 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
         actual_first_column = self.actual_all_tracked_table.columns[5]
         assert actual_first_column == expected_column
 
-    def test_create_all_tracked_plist_files_table_seventh_column(self):
+    def test_create_all_tracked_plist_files_table_seventh_column_attributes(self):
         """Test the styling and contents of the seventh column."""
         expected_column = Column(
             header="Status",
