@@ -123,12 +123,12 @@ def list_plists(args):
         logger.debug("Displaying a single plist file detail.")
         db_displayer = DbDisplayer(USER_CONFIG)
         row = db_getters.get_a_single_plist_file_details(args.plist_id)
-        db_displayer.display_plist_detail(row)
+        db_displayer.display_single_plist_file_detail_table(row)
     else:
         logger.debug("Displaying all plist files.")
         all_rows = db_getters.get_all_tracked_plist_files()
         db_all_rows_displayer = DbDisplayer(USER_CONFIG)
-        db_all_rows_displayer.display_all_rows_table(all_rows)
+        db_all_rows_displayer.display_all_tracked_plist_files_table(all_rows)
 
 
 def install_plist(args):
