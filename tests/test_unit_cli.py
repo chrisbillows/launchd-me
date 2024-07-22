@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from typing import Any
 
 import pytest
 from launchd_me.cli import (
@@ -14,23 +15,26 @@ from launchd_me.cli import (
 )
 
 
-def test_valid_path_for_a_valid_string(tmp_path):
-    """Test valid_path function with a valid string.
+def test_valid_path_for_a_valid_string(tmp_path: Path):
+    """Test ``valid_path`` function with a valid string.
+
+    The script is passed as a string to replicate user input.
 
     Parameters
     ----------
-    tmp_path : pathlib.Path
+    tmp_path : Path
         Temporary directory provided by pytest.
     """
-    synthetic_script: Path = tmp_path / "synthetic_script.py"
+    synthetic_script = tmp_path / "synthetic_script.py"
     synthetic_script.touch()
-    synthetic_script_as_string = str(synthetic_script)
-    expected = valid_path(synthetic_script)
+    expected = valid_path(str(synthetic_script))
     assert expected.name == "synthetic_script.py"
 
 
-def test_valid_path_returns_expected_type(tmp_path):
-    """Test valid_path function returns expected type.
+def test_valid_path_returns_expected_type(tmp_path: Path):
+    """Test ``valid_path`` function returns expected type.
+
+    The script is passed as a string to replicate user input.
 
     Parameters
     ----------
@@ -39,32 +43,36 @@ def test_valid_path_returns_expected_type(tmp_path):
     """
     synthetic_script: Path = tmp_path / "synthetic_script.py"
     synthetic_script.touch()
-    synthetic_script_as_string = str(synthetic_script)
-    expected = valid_path(synthetic_script)
+    expected = valid_path(str(synthetic_script))
     assert isinstance(expected, Path)
 
 
 def test_valid_path_for_invalid_strings():
-    """Test valid_path function with invalid strings."""
+    """Test ``valid_path`` function with invalid strings."""
     non_existent_script = "non_existent_script.py"
     with pytest.raises(argparse.ArgumentTypeError):
         valid_path(non_existent_script)
 
 
 class TestCLIArgumentParser:
-    """Test suite for the CLIArgumentParser class.
+    """Test suite for the ``CLIArgumentParser`` class.
 
-    This class contains tests for the CLIArgumentParser class, ensuring that the
+    This class contains tests for the ``CLIArgumentParser`` class, ensuring that the
     argument parser and its subcommands are correctly configured and function as
     expected.
 
-    The suite assumes argparse validates values as expected. Invalid values are
-    therefore not tested.
+    The suite assumes values are validated by argparse. Invalid values are not tested.
     """
 
     @pytest.fixture(autouse=True)
-    def setup_synthetic_script_for_all_tests_in_class(self, tmp_path):
-        """Setup a synthetic script for all tests in the class.
+    def setup_synthetic_script_for_all_tests_in_class(self, tmp_path: Path):
+        """Set up a synthetic script for all tests in the class.
+
+        Attributes
+        ----------
+        synthetic_script : str
+            Path to a synthetic script "synthetic_script.py" in a ``tmp_path``
+            directory.
 
         Parameters
         ----------
@@ -77,7 +85,13 @@ class TestCLIArgumentParser:
 
     @pytest.fixture(autouse=True)
     def setup_parser_for_all_tests_in_class(self):
-        """Setup the parser for all tests in the class."""
+        """Setup a Parser for all tests in the class.
+
+        Attributes
+        ----------
+        Argparse.ArgumentParser
+            Configured with commands and subcommands.
+        """
         parser_creator = CLIArgumentParser()
         self.parser = parser_creator.create_parser()
 
@@ -92,7 +106,9 @@ class TestCLIArgumentParser:
             ("func", create_plist),
         ],
     )
-    def test_create_command_args(self, monkeypatch, attribute, expected_value):
+    def test_create_command_args(
+        self, monkeypatch: pytest.MonkeyPatch, attribute: str, expected_value: Any
+    ):
         """Test the 'create' command arguments. ``script_path`` is tested separately.
 
         Parameters
@@ -116,7 +132,7 @@ class TestCLIArgumentParser:
         args = self.parser.parse_args()
         assert getattr(args, attribute) == expected_value
 
-    def test_create_command_script_path_arg(self, monkeypatch):
+    def test_create_command_script_path_arg(self, monkeypatch: pytest.MonkeyPatch):
         """Test the 'create' script path command argument.
 
         Separated from ``test_create_command_args`` to test against the ``.name``
@@ -143,7 +159,9 @@ class TestCLIArgumentParser:
         "test_args, plist_id_value",
         [(["ldm", "list"], None), (["ldm", "list", "123"], 123)],
     )
-    def test_list_command_args(self, monkeypatch, test_args, plist_id_value):
+    def test_list_command_args(
+        self, monkeypatch: pytest.MonkeyPatch, test_args: list, plist_id_value: Any
+    ):
         """Test the 'list' command arguments.
 
         ``lists_plists`` expects either no passed argument (to display all tracked
@@ -163,7 +181,7 @@ class TestCLIArgumentParser:
         assert args.func == list_plists
         assert args.plist_id == plist_id_value
 
-    def test_install_command_args(self, monkeypatch):
+    def test_install_command_args(self, monkeypatch: pytest.MonkeyPatch):
         """Test the 'install' command arguments.
 
         Parameters
@@ -177,12 +195,12 @@ class TestCLIArgumentParser:
         assert args.func == install_plist
         assert args.plist_id == "123"
 
-    def test_uninstall_command_args(self, monkeypatch):
+    def test_uninstall_command_args(self, monkeypatch: pytest.MonkeyPatch):
         """Test the 'uninstall' command arguments.
 
         Parameters
         ----------
-        monkeypatch : _pytest.monkeypatch.MonkeyPatch
+        monkeypatch : pytest.MonkeyPatch
             Monkeypatch fixture to modify sys.argv.
         """
         test_args = ["ldm", "uninstall", "123"]
@@ -191,7 +209,7 @@ class TestCLIArgumentParser:
         assert args.func == uninstall_plist
         assert args.plist_id == "123"
 
-    def test_reset_command_args(self, monkeypatch):
+    def test_reset_command_args(self, monkeypatch: pytest.MonkeyPatch):
         """Test the 'reset' command arguments.
 
         Parameters
