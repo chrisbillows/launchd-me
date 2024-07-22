@@ -52,6 +52,16 @@ def test_valid_path_for_invalid_strings():
 
 
 class TestCLIArgumentParser:
+    """Test suite for the CLIArgumentParser class.
+
+    This class contains tests for the CLIArgumentParser class, ensuring that the
+    argument parser and its subcommands are correctly configured and function as
+    expected.
+
+    The suite assumes argparse validates values as expected. Invalid values are
+    therefore not tested.
+    """
+
     @pytest.fixture(autouse=True)
     def setup_synthetic_script_for_all_tests_in_class(self, tmp_path):
         """Setup a synthetic script for all tests in the class.
@@ -83,9 +93,7 @@ class TestCLIArgumentParser:
         ],
     )
     def test_create_command_args(self, monkeypatch, attribute, expected_value):
-        """Test the 'create' command arguments.
-
-        ``script_path`` is tested separately.
+        """Test the 'create' command arguments. ``script_path`` is tested separately.
 
         Parameters
         ----------
