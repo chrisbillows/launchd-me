@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 from launchd_me.cli import (
+    CLIArgumentParser,
     create_plist,
-    get_args,
     install_plist,
     list_plists,
     main,
@@ -38,20 +38,25 @@ def test_valid_path_for_invalid_strings():
 
 class TestGetArgs:
     @pytest.fixture(autouse=True)
-    def setup_for_all_tests_in_class(self, tmp_path):
+    def setup_synthetic_script_for_all_tests_in_class(self, tmp_path):
         synthetic_script_as_a_path: Path = tmp_path / "synthetic_script.py"
         synthetic_script_as_a_path.touch()
         self.synthetic_script = str(synthetic_script_as_a_path)
 
+    @pytest.fixture(autouse=True)
+    def setup_parser_for_all_test_in_class(self):
+        parser_creator = CLIArgumentParser()
+        self.parser = parser_creator.create_parser()
+
     @pytest.mark.parametrize(
         "attribute, expected_value",
         [
-            ("command", "create"),
             ("schedule_type", "interval"),
             ("schedule_details", 300),
             ("description", "Test description"),
             ("make_executable", True),
             ("auto_install", True),
+            ("func", create_plist),
         ],
     )
     def test_get_args_create_command(self, monkeypatch, attribute, expected_value):
@@ -64,7 +69,7 @@ class TestGetArgs:
             "Test description",
         ]
         monkeypatch.setattr("sys.argv", test_args)
-        args = get_args()
+        args = self.parser.parse_args()
         assert getattr(args, attribute) == expected_value
 
     def test_get_args_create_command_for_script_path(self, monkeypatch):
@@ -77,32 +82,35 @@ class TestGetArgs:
             "Test description",
         ]
         monkeypatch.setattr("sys.argv", test_args)
-        args = get_args()
+        args = self.parser.parse_args()
         assert args.script_path.name == "synthetic_script.py"
 
-    def test_get_args_list_command(self, monkeypatch):
-        test_args = ["ldm", "list", "-p", "123"]
+    @pytest.mark.parametrize(
+        "test_args, plist_id_value",
+        [(["ldm", "list"], None), (["ldm", "list", "123"], 123)],
+    )
+    def test_get_args_list_command(self, monkeypatch, test_args, plist_id_value):
         monkeypatch.setattr("sys.argv", test_args)
-        args = get_args()
-        assert args.command == "list"
-        assert args.plist_id == 123
+        args = self.parser.parse_args()
+        assert args.func == list_plists
+        assert args.plist_id == plist_id_value
 
     def test_get_args_install_command(self, monkeypatch):
         test_args = ["ldm", "install", "123"]
         monkeypatch.setattr("sys.argv", test_args)
-        args = get_args()
-        assert args.command == "install"
+        args = self.parser.parse_args()
+        assert args.func == install_plist
         assert args.plist_id == "123"
 
     def test_get_args_uninstall_command(self, monkeypatch):
         test_args = ["ldm", "uninstall", "123"]
         monkeypatch.setattr("sys.argv", test_args)
-        args = get_args()
-        assert args.command == "uninstall"
+        args = self.parser.parse_args()
+        assert args.func == uninstall_plist
         assert args.plist_id == "123"
 
     def test_get_args_reset_command(self, monkeypatch):
         test_args = ["ldm", "reset"]
         monkeypatch.setattr("sys.argv", test_args)
-        args = get_args()
-        assert args.command == "reset"
+        args = self.parser.parse_args()
+        assert args.func == reset_user
