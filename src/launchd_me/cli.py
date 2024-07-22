@@ -15,15 +15,18 @@ from launchd_me.plist import (
 )
 
 USER_CONFIG = UserConfig()
-LOGO = """
- ___      _______  __   __  __    _  _______  __   __  ______     __   __  _______  __
-|   |    |   _   ||  | |  ||  |  | ||       ||  | |  ||      |   |  |_|  ||       ||  |
-|   |    |  |_|  ||  | |  ||   |_| ||       ||  |_|  ||  _    |  |       ||    ___||  |
-|   |    |       ||  |_|  ||       ||       ||       || | |   |  |       ||   |___ |  |
-|   |___ |       ||       ||  _    ||      _||       || |_|   |  |       ||    ___||__|
-|       ||   _   ||       || | |   ||     |_ |   _   ||       |  | ||_|| ||   |___  __
-|_______||__| |__||_______||_|  |__||_______||__| |__||______|   |_|   |_||_______||__|
+LOGO_ART = """
+ ___       _______   __   __   __    _   _______   __   __   ______      __   __   _______   __
+|   |     |   _   | |  | |  | |  |  | | |       | |  | |  | |      |    |  |_|  | |       | |  |
+|   |     |  |_|  | |  | |  | |   |_| | |       | |  |_|  | |  _    |   |       | |    ___| |  |
+|   |     |       | |  |_|  | |       | |       | |       | | | |   |   |       | |   |___  |  |
+|   |___  |       | |       | |  _    | |      _| |       | | |_|   |   |       | |    ___| |__|
+|       | |   _   | |       | | | |   | |     |_  |   _   | |       |   | ||_|| | |   |___   __
+|_______| |__| |__| |_______| |_|  |__| |_______| |__| |__| |______|    |_|   |_| |_______| |__|
 """
+LOGO_DIVIDER = "=" * 96
+LOGO_TEXT = "Easily schedule your scripts on macOS!".center(96, " ")
+LOGO = f"{LOGO_ART}\n{LOGO_DIVIDER}\n{LOGO_TEXT}\n{LOGO_DIVIDER}\n\n"
 CLI_TEXT = {
     "PARSER": {"DESCRIPTION": "Easily schedule your scripts on macOS."},
     "SUBPARSER": {
@@ -37,9 +40,9 @@ CLI_TEXT = {
             "ARGS": {
                 "SCRIPT_PATH_HELP": "path to the script to schedule.",
                 "SCHEDULE_TYPE_HELP": """schedule_type. An 'interval' schedule requires seconds e.g. 300. A 'calendar'
-                                             schedules require a dictionary of fields e.g. {'Weekday': 1, 'Hour': 8}.
-                                             Allowed fields are: 'Minute', 'Hour', 'Day', 'Weekday', 'Month'. See the
-                                             documentation for more details.""",
+                                         schedules require a dictionary of fields e.g. {'Weekday': 1, 'Hour': 8}.
+                                         Allowed fields are: 'Minute', 'Hour', 'Day', 'Weekday', 'Month'. See the
+                                         documentation for more details.""",
                 "SCHEDULE_DETAILS_HELP": "schedule for running the script e.g. 300 or {'Weekday': 1, 'Hour': 8}.",
                 "DESCRIPTION_HELP": "description of what you're automating e.g. daily downloads tidy.",
                 "MAKE_EXECUTABLE_HELP": "ensure the specified script is executable. defaults to true.",
@@ -47,7 +50,7 @@ CLI_TEXT = {
             },
         },
         "LIST": {
-            "DESCRIPTION": "List all tracked plist files or show a given plist_id",
+            "DESCRIPTION": "List all tracked plist files or show a given plist_id.",
             "HELP": "list all tracked plist files or show a given plist_id",
             "ARGS": {"PLIST_ID_HELP": "display details of plist_id"},
         },
@@ -62,7 +65,7 @@ CLI_TEXT = {
             "ARGS": {"PLIST_ID_HELP": "the plist file to un-install"},
         },
         "RESET": {
-            "DESCRIPTION": "delete the current db and plist directory. currently does not unload or delete existing plist symlinks",
+            "DESCRIPTION": "Delete the current db and plist directory. Currently does not unload or delete existing plist symlinks.",
             "HELP": "delete the current db and plist directory. currently does not unload or delete existing plist symlinks",
         },
     },
@@ -111,7 +114,9 @@ class CLIArgumentParser:
 
     def __init__(self) -> None:
         self.parser = argparse.ArgumentParser(
-            prog="ldm", description=CLI_TEXT["PARSER"]["DESCRIPTION"]
+            prog="ldm",
+            description=LOGO,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         self.parser.set_defaults(func=self._default_action)
         self.subparsers = self.parser.add_subparsers(
@@ -169,8 +174,9 @@ class CLIArgumentParser:
         """
         parser_create = self.subparsers.add_parser(
             "create",
-            description=CLI_TEXT["COMMANDS"]["CREATE"]["DESCRIPTION"],
             help=CLI_TEXT["COMMANDS"]["CREATE"]["HELP"],
+            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["CREATE"]["DESCRIPTION"]}",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         parser_create.set_defaults(func=create_plist)
         parser_create.add_argument(
@@ -221,8 +227,9 @@ class CLIArgumentParser:
         """
         parser_list = self.subparsers.add_parser(
             "list",
-            description=CLI_TEXT["COMMANDS"]["LIST"]["DESCRIPTION"],
+            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["LIST"]["DESCRIPTION"]}",
             help=CLI_TEXT["COMMANDS"]["LIST"]["HELP"],
+            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         parser_list.set_defaults(func=list_plists)
         parser_list.add_argument(
@@ -244,8 +251,9 @@ class CLIArgumentParser:
         """
         parser_install = self.subparsers.add_parser(
             "install",
-            description=CLI_TEXT["COMMANDS"]["INSTALL"]["DESCRIPTION"],
+            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["INSTALL"]["DESCRIPTION"]}",
             help=CLI_TEXT["COMMANDS"]["INSTALL"]["HELP"],
+            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         parser_install.set_defaults(func=install_plist)
         parser_install.add_argument(
@@ -264,8 +272,9 @@ class CLIArgumentParser:
         """
         parser_uninstall = self.subparsers.add_parser(
             "uninstall",
-            description=CLI_TEXT["COMMANDS"]["UNINSTALL"]["DESCRIPTION"],
+            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["UNINSTALL"]["DESCRIPTION"]}",
             help=CLI_TEXT["COMMANDS"]["UNINSTALL"]["HELP"],
+            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         parser_uninstall.set_defaults(func=uninstall_plist)
         parser_uninstall.add_argument("plist_id", help="The plist to un-install")
@@ -279,8 +288,9 @@ class CLIArgumentParser:
         """
         parser_reset = self.subparsers.add_parser(
             "reset",
-            description=CLI_TEXT["COMMANDS"]["RESET"]["DESCRIPTION"],
+            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["RESET"]["DESCRIPTION"]}",
             help=CLI_TEXT["COMMANDS"]["RESET"]["HELP"],
+            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         parser_reset.set_defaults(func=reset_user)
 
