@@ -394,7 +394,7 @@ def uninstall_plist(args: argparse.Namespace) -> None:
     db_getter.verify_a_plist_id_is_valid(args.plist_id)
     plist_detail = db_getter.get_a_single_plist_file_details(args.plist_id)
     plist_file_name = Path(plist_detail["PlistFileName"])
-    symlink_to_plist = USER_CONFIG.launch_agents_dir / plist_file_name
+    symlink_to_plist = Path(USER_CONFIG.launch_agents_dir) / plist_file_name
     install_manager.uninstall_plist(args.plist_id, symlink_to_plist)
 
 

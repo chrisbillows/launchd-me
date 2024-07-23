@@ -1,8 +1,10 @@
 import argparse
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import launchd_me
+import launchd_me.cli
 import pytest
 from launchd_me.cli import (
     CLIArgumentParser,
@@ -14,7 +16,9 @@ from launchd_me.cli import (
     uninstall_plist,
     valid_path,
 )
-from launchd_me.plist import DbDisplayer
+from launchd_me.plist import DbDisplayer, UserConfig
+
+from tests.test_unit_plist import mock_user_config
 
 
 def test_valid_path_for_a_valid_string(tmp_path: Path):
@@ -225,6 +229,10 @@ class TestCLIArgumentParser:
         assert args.func == reset_user
 
 
+class TestCreatePlist:
+    pass
+
+
 class TestListPlists:
     """A test suite for testing the `list_plists` function within the CLI.
 
@@ -240,7 +248,9 @@ class TestListPlists:
         Test the behaviour of `list_plists` when a specific plist ID is provided.
     """
 
-    def test_list_plists_without_id(self):
+    @patch("launchd_me.cli.DbDisplayer")
+    @patch("launchd_me.cli.PlistDbGetters")
+    def test_list_plists_without_id_arg(self, MockDbGetters, MockDbDisplayer):
         """Test `list_plists` for its ability to list all tracked plist files.
 
         This method asserts that if no plist ID is provided in the arguments,
@@ -251,21 +261,21 @@ class TestListPlists:
         the function's flow and data handling are as designed.
         """
         args = argparse.Namespace(plist_id=None)
-        with patch("launchd_me.cli.PlistDbGetters") as MockDbGetter, patch(
-            "launchd_me.cli.DbDisplayer"
-        ) as MockDbDisplayer:
-            mock_db_getter = MockDbGetter.return_value
-            mock_db_displayer = MockDbDisplayer.return_value
-            mock_db_getter.get_all_tracked_plist_files.return_value = [
-                {"id": "123", "name": "TestPlist"}
-            ]
-            list_plists(args)
-            mock_db_getter.get_all_tracked_plist_files.assert_called_once()
-            mock_db_displayer.display_all_tracked_plist_files_table.assert_called_once_with(
-                [{"id": "123", "name": "TestPlist"}]
-            )
 
-    def test_list_plists_with_id(self):
+        mock_db_getter = MockDbGetters.return_value
+        mock_db_displayer = MockDbDisplayer.return_value
+        mock_db_getter.get_all_tracked_plist_files.return_value = [
+            {"id": "123", "name": "TestPlist"}
+        ]
+        list_plists(args)
+        mock_db_getter.get_all_tracked_plist_files.assert_called_once()
+        mock_db_displayer.display_all_tracked_plist_files_table.assert_called_once_with(
+            [{"id": "123", "name": "TestPlist"}]
+        )
+
+    @patch("launchd_me.cli.DbDisplayer")
+    @patch("launchd_me.cli.PlistDbGetters")
+    def test_list_plists_with_id_arg(self, MockDbGetters, MockDbDisplayer):
         """Test `list_plists` for its behaviour when a specific plist ID is provided.
 
         This method asserts that providing a plist ID causes `list_plists` to retrieve
@@ -275,19 +285,86 @@ class TestListPlists:
         the function's flow and data handling are as designed.
         """
         args = argparse.Namespace(plist_id="123")
-        with patch("launchd_me.cli.PlistDbGetters") as MockDbGetter, patch(
-            "launchd_me.cli.DbDisplayer"
-        ) as MockDbDisplayer:
-            mock_db_getter = MockDbGetter.return_value
-            mock_db_displayer = MockDbDisplayer.return_value
-            mock_db_getter.get_a_single_plist_file_details.return_value = {
-                "id": "123",
-                "name": "TestPlist",
-            }
-            list_plists(args)
-            mock_db_getter.get_a_single_plist_file_details.assert_called_once_with(
-                "123"
-            )
-            mock_db_displayer.display_single_plist_file_detail_table.assert_called_once_with(
-                {"id": "123", "name": "TestPlist"}
-            )
+        mock_db_getters = MockDbGetters.return_value
+        mock_db_displayer = MockDbDisplayer.return_value
+        mock_db_getters.get_a_single_plist_file_details.return_value = {
+            "id": "123",
+            "name": "TestPlist",
+        }
+        list_plists(args)
+        mock_db_getters.get_a_single_plist_file_details.assert_called_once_with("123")
+        mock_db_displayer.display_single_plist_file_detail_table.assert_called_once_with(
+            {"id": "123", "name": "TestPlist"}
+        )
+
+
+@patch("launchd_me.cli.USER_CONFIG", autospec=True)
+@patch("launchd_me.cli.PlistDbGetters")
+@patch("launchd_me.cli.PlistDbSetters")
+@patch("launchd_me.cli.PlistInstallationManager")
+def test_install_plist(
+    MockInstallationManager, MockDbSetters, MockDbGetters, MockUserConfig
+):
+    """Assert that the expected methods are called with the expected values, based on the
+    passed arguments.
+    """
+    args = argparse.Namespace(plist_id="123")
+
+    mock_db_getter = MockDbGetters.return_value
+    mock_db_setter = MockDbSetters.return_value
+    mock_installation_manager = MockInstallationManager.return_value
+    mock_user_config = MockUserConfig.return_value
+
+    mock_db_getter.verify_a_plist_id_is_valid.return_value = None
+    mock_db_getter.get_a_single_plist_file_details.return_value = {
+        "plist_id": "123",
+        "PlistFileName": "synthetic_file_name",
+    }
+    mock_installation_manager.install_plist.return_value
+    mock_user_config.plist_dir = "a_directory"
+
+    install_plist(args)
+
+    mock_db_getter.verify_a_plist_id_is_valid.assert_called_once_with("123")
+    mock_db_getter.get_a_single_plist_file_details.assert_called_once_with("123")
+    mock_installation_manager.install_plist.assert_called_once_with(
+        "123", Path("synthetic_file_name")
+    )
+
+
+@patch("launchd_me.cli.USER_CONFIG", autospec=True)
+@patch("launchd_me.cli.PlistDbGetters")
+@patch("launchd_me.cli.PlistDbSetters")
+@patch("launchd_me.cli.PlistInstallationManager")
+def test_uninstall_plist(
+    MockInstallationManager, MockDbSetters, MockDbGetters, MockUserConfig
+):
+    """Assert that the expected methods are called with the expected values, based on the
+    passed arguments.
+    """
+    args = argparse.Namespace(plist_id="123")
+
+    mock_db_getter = MockDbGetters.return_value
+    mock_db_setter = MockDbSetters.return_value
+    mock_installation_manager = MockInstallationManager.return_value
+    mock_user_config = MockUserConfig.return_value
+
+    mock_db_getter.verify_a_plist_id_is_valid.return_value = None
+    mock_db_getter.get_a_single_plist_file_details.return_value = {
+        "plist_id": "123",
+        "PlistFileName": "synthetic_file_name",
+    }
+    mock_installation_manager.uninstall_plist.return_value
+    mock_user_config.launch_agents_dir = "a_directory"
+
+    uninstall_plist(args)
+
+    mock_db_getter.verify_a_plist_id_is_valid.assert_called_once_with("123")
+    mock_db_getter.get_a_single_plist_file_details.assert_called_once_with("123")
+    mock_installation_manager.uninstall_plist.assert_called_once_with(
+        "123", Path("synthetic_file_name")
+    )
+
+
+class ResetUser:
+    args = argparse.Namespace()
