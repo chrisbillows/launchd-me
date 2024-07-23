@@ -175,8 +175,7 @@ class CLIArgumentParser:
         parser_create = self.subparsers.add_parser(
             "create",
             help=CLI_TEXT["COMMANDS"]["CREATE"]["HELP"],
-            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["CREATE"]["DESCRIPTION"]}",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=CLI_TEXT["COMMANDS"]["CREATE"]["DESCRIPTION"],
         )
         parser_create.set_defaults(func=create_plist)
         parser_create.add_argument(
@@ -227,9 +226,8 @@ class CLIArgumentParser:
         """
         parser_list = self.subparsers.add_parser(
             "list",
-            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["LIST"]["DESCRIPTION"]}",
+            description=CLI_TEXT["COMMANDS"]["LIST"]["DESCRIPTION"],
             help=CLI_TEXT["COMMANDS"]["LIST"]["HELP"],
-            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         parser_list.set_defaults(func=list_plists)
         parser_list.add_argument(
@@ -251,9 +249,8 @@ class CLIArgumentParser:
         """
         parser_install = self.subparsers.add_parser(
             "install",
-            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["INSTALL"]["DESCRIPTION"]}",
+            description=CLI_TEXT["COMMANDS"]["INSTALL"]["DESCRIPTION"],
             help=CLI_TEXT["COMMANDS"]["INSTALL"]["HELP"],
-            formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         parser_install.set_defaults(func=install_plist)
         parser_install.add_argument(
@@ -272,7 +269,7 @@ class CLIArgumentParser:
         """
         parser_uninstall = self.subparsers.add_parser(
             "uninstall",
-            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["UNINSTALL"]["DESCRIPTION"]}",
+            description=CLI_TEXT["COMMANDS"]["UNINSTALL"]["DESCRIPTION"],
             help=CLI_TEXT["COMMANDS"]["UNINSTALL"]["HELP"],
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -288,7 +285,7 @@ class CLIArgumentParser:
         """
         parser_reset = self.subparsers.add_parser(
             "reset",
-            description=f"{LOGO}\n{CLI_TEXT["COMMANDS"]["RESET"]["DESCRIPTION"]}",
+            description=CLI_TEXT["COMMANDS"]["RESET"]["DESCRIPTION"],
             help=CLI_TEXT["COMMANDS"]["RESET"]["HELP"],
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
