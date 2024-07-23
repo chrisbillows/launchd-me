@@ -1,9 +1,8 @@
 import argparse
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import Mock, patch
 
-import launchd_me
 import launchd_me.cli
 import pytest
 from launchd_me.cli import (
@@ -16,19 +15,16 @@ from launchd_me.cli import (
     uninstall_plist,
     valid_path,
 )
-from launchd_me.plist import DbDisplayer, UserConfig
-
-from tests.test_unit_plist import mock_user_config
 
 
 def test_valid_path_for_a_valid_string(tmp_path: Path):
-    """Test ``valid_path`` function with a valid string.
+    """Test `valid_path` function with a valid string.
 
-    The script is passed as a string to replicate user input.
+    The synthetic script is passed as a string to replicate user input.
 
     Parameters
     ----------
-    tmp_path : Path
+    tmp_path : pathlib.Path
         Temporary directory provided by pytest.
     """
     synthetic_script = tmp_path / "synthetic_script.py"
@@ -38,9 +34,9 @@ def test_valid_path_for_a_valid_string(tmp_path: Path):
 
 
 def test_valid_path_returns_expected_type(tmp_path: Path):
-    """Test ``valid_path`` function returns expected type.
+    """Test `valid_path` function returns expected type.
 
-    The script is passed as a string to replicate user input.
+    The synthetic script is passed as a string to replicate user input.
 
     Parameters
     ----------
@@ -54,16 +50,16 @@ def test_valid_path_returns_expected_type(tmp_path: Path):
 
 
 def test_valid_path_for_invalid_strings():
-    """Test ``valid_path`` function with invalid strings."""
+    """Test `valid_path` function with an invalid string."""
     non_existent_script = "non_existent_script.py"
     with pytest.raises(argparse.ArgumentTypeError):
         valid_path(non_existent_script)
 
 
 class TestCLIArgumentParser:
-    """Test suite for the ``CLIArgumentParser`` class.
+    """Test suite for the `CLIArgumentParser` class.
 
-    This class contains tests for the ``CLIArgumentParser`` class, ensuring that the
+    This class contains tests for the `CLIArgumentParser` class, ensuring that the
     argument parser and its subcommands are correctly configured and function as
     expected.
 
@@ -77,7 +73,7 @@ class TestCLIArgumentParser:
         Attributes
         ----------
         synthetic_script : str
-            Path to a synthetic script "synthetic_script.py" in a ``tmp_path``
+            Path to a synthetic script `synthetic_script.py` in a `tmp_path`
             directory.
 
         Parameters
@@ -96,7 +92,8 @@ class TestCLIArgumentParser:
         Attributes
         ----------
         Argparse.ArgumentParser
-            Configured with commands and subcommands.
+            An argparse ArgumentParser configured with `launchd_me` commands and
+            subcommands.
         """
         parser_creator = CLIArgumentParser()
         self.parser = parser_creator.create_parser()
@@ -119,7 +116,7 @@ class TestCLIArgumentParser:
 
         Parameters
         ----------
-        monkeypatch : _pytest.monkeypatch.MonkeyPatch
+        monkeypatch : pytest.MonkeyPatch
             Monkeypatch fixture to modify sys.argv.
         attribute : str
             The attribute to check in the parsed arguments.
@@ -141,8 +138,8 @@ class TestCLIArgumentParser:
     def test_create_command_script_path_arg(self, monkeypatch: pytest.MonkeyPatch):
         """Test the 'create' script path command argument.
 
-        Separated from ``test_create_command_args`` to test against the ``.name``
-        pathlib Path attribute. The full file path will change as it's a ``tmp_path``.
+        Separated from `test_create_command_args` to test against the `.name`
+        pathlib Path attribute. The full file path changes as it's a `tmp_path`.
 
         Parameters
         ----------
@@ -168,14 +165,16 @@ class TestCLIArgumentParser:
     def test_list_command_args(
         self, monkeypatch: pytest.MonkeyPatch, test_args: list, plist_id_value: Any
     ):
-        """Test the 'list' command arguments.
+        """Test the `'list'` command arguments.
 
-        ``lists_plists`` expects either no passed argument (to display all tracked
-        plist files) or a ``plist_id`` to display details of a specific plist file.
+        `lists_plists` expects either no passed argument (to display all tracked
+        plist files) or a `plist_id` to display details of a specific plist file. This
+        test checks if the command line arguments for the `'uninstall'` command
+        are parsed as expected using a monkeypatch to simulate command line input.
 
         Parameters
         ----------
-        monkeypatch : _pytest.monkeypatch.MonkeyPatch
+        monkeypatch : pytest.MonkeyPatch
             Monkeypatch fixture to modify sys.argv.
         test_args : list
             The command-line arguments to test.
@@ -190,9 +189,12 @@ class TestCLIArgumentParser:
     def test_install_command_args(self, monkeypatch: pytest.MonkeyPatch):
         """Test the 'install' command arguments.
 
+        This test checks if the command line arguments for the `'install'` command
+        are parsed as expected using a monkeypatch to simulate command line input.
+
         Parameters
         ----------
-        monkeypatch : _pytest.monkeypatch.MonkeyPatch
+        monkeypatch : pytest.MonkeyPatch
             Monkeypatch fixture to modify sys.argv.
         """
         test_args = ["ldm", "install", "123"]
@@ -202,7 +204,10 @@ class TestCLIArgumentParser:
         assert args.plist_id == "123"
 
     def test_uninstall_command_args(self, monkeypatch: pytest.MonkeyPatch):
-        """Test the 'uninstall' command arguments.
+        """Test the `'uninstall'` command arguments.
+
+        This test checks if the command line arguments for the `'uninstall'` command
+        are parsed as expected using a monkeypatch to simulate command line input.
 
         Parameters
         ----------
@@ -218,9 +223,12 @@ class TestCLIArgumentParser:
     def test_reset_command_args(self, monkeypatch: pytest.MonkeyPatch):
         """Test the 'reset' command arguments.
 
+        This test checks if the command line arguments for the `'reset'` command
+        are parsed as expected using a monkeypatch to simulate command line input.
+
         Parameters
         ----------
-        monkeypatch : _pytest.monkeypatch.MonkeyPatch
+        monkeypatch : pytest.MonkeyPatch
             Monkeypatch fixture to modify sys.argv.
         """
         test_args = ["ldm", "reset"]
@@ -229,8 +237,26 @@ class TestCLIArgumentParser:
         assert args.func == reset_user
 
 
-class TestCreatePlist:
-    pass
+@patch("launchd_me.cli.PlistCreator")
+def test_create_plist(MockPlistCreator: Mock):
+    """Test the `create_plist` function within the CLI.
+
+    Test `create_plist` calls the expected methods with the expected values, based
+    on the passed arguments. Mocks are used to simulate the creator process, validating
+    that the function's flow and data handling are as expected.
+    """
+    args = argparse.Namespace(
+        script_path="path/to/script",
+        schedule_type="interval",
+        schedule_details={"interval": 300},
+        description="Test script",
+        make_executable=True,
+        auto_install=True,
+    )
+    mock_plist_creator = MockPlistCreator.return_value
+    mock_plist_creator.driver.return_value = Path("plist_file_path")
+    create_plist(args)
+    mock_plist_creator.driver.assert_called_once()
 
 
 class TestListPlists:
@@ -250,7 +276,9 @@ class TestListPlists:
 
     @patch("launchd_me.cli.DbDisplayer")
     @patch("launchd_me.cli.PlistDbGetters")
-    def test_list_plists_without_id_arg(self, MockDbGetters, MockDbDisplayer):
+    def test_list_plists_without_id_arg(
+        self, MockDbGetters: Mock, MockDbDisplayer: Mock
+    ):
         """Test `list_plists` for its ability to list all tracked plist files.
 
         This method asserts that if no plist ID is provided in the arguments,
@@ -258,7 +286,14 @@ class TestListPlists:
         response to the display function.
 
         Mocks are used to simulate the retrieval and display processes, validating that
-        the function's flow and data handling are as designed.
+        the function's flow and data handling are as expected.
+
+        Parameters
+        ----------
+        MockDbGetters : Mock
+            A mock of the PlistDbGetters class to simulate database interactions.
+        MockDbDisplayer : Mock
+            A mock of the DbDisplayer class to simulate the display functionality.
         """
         args = argparse.Namespace(plist_id=None)
 
@@ -275,7 +310,7 @@ class TestListPlists:
 
     @patch("launchd_me.cli.DbDisplayer")
     @patch("launchd_me.cli.PlistDbGetters")
-    def test_list_plists_with_id_arg(self, MockDbGetters, MockDbDisplayer):
+    def test_list_plists_with_id_arg(self, MockDbGetters: Mock, MockDbDisplayer: Mock):
         """Test `list_plists` for its behaviour when a specific plist ID is provided.
 
         This method asserts that providing a plist ID causes `list_plists` to retrieve
@@ -283,6 +318,13 @@ class TestListPlists:
 
         Mocks are used to simulate the retrieval and display processes, validating that
         the function's flow and data handling are as designed.
+
+        Parameters
+        ----------
+        MockDbGetters : Mock
+            A mock of the PlistDbGetters class to simulate database interactions.
+        MockDbDisplayer : Mock
+            A mock of the DbDisplayer class to simulate the display functionality.
         """
         args = argparse.Namespace(plist_id="123")
         mock_db_getters = MockDbGetters.return_value
@@ -303,10 +345,16 @@ class TestListPlists:
 @patch("launchd_me.cli.PlistDbSetters")
 @patch("launchd_me.cli.PlistInstallationManager")
 def test_install_plist(
-    MockInstallationManager, MockDbSetters, MockDbGetters, MockUserConfig
+    MockInstallationManager: Mock,
+    MockDbSetters: Mock,
+    MockDbGetters: Mock,
+    MockUserConfig: Mock,
 ):
-    """Assert that the expected methods are called with the expected values, based on the
-    passed arguments.
+    """Test the `install_plist` function within the CLI.
+
+    Test `install_plist` calls the expected methods with the expected values, based
+    on the passed arguments. Mocks are used to simulate the getter, setter and install
+    processes, validating that the function's flow and data handling are as expected.
     """
     args = argparse.Namespace(plist_id="123")
 
@@ -339,8 +387,8 @@ def test_install_plist(
 def test_uninstall_plist(
     MockInstallationManager, MockDbSetters, MockDbGetters, MockUserConfig
 ):
-    """Assert that the expected methods are called with the expected values, based on the
-    passed arguments.
+    """Assert that the expected methods are called with the expected values, based on
+    the passed arguments.
     """
     args = argparse.Namespace(plist_id="123")
 
@@ -366,5 +414,11 @@ def test_uninstall_plist(
     )
 
 
-class ResetUser:
+# TODO: Wait until the functionality is finished.
+def test_reset_user():
     args = argparse.Namespace()
+    pass
+
+
+def test_main():
+    pass
