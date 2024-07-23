@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from launchd_me.cli import (
@@ -13,6 +14,7 @@ from launchd_me.cli import (
     uninstall_plist,
     valid_path,
 )
+from launchd_me.plist import DbDisplayer
 
 
 def test_valid_path_for_a_valid_string(tmp_path: Path):
@@ -221,3 +223,71 @@ class TestCLIArgumentParser:
         monkeypatch.setattr("sys.argv", test_args)
         args = self.parser.parse_args()
         assert args.func == reset_user
+
+
+class TestListPlists:
+    """A test suite for testing the `list_plists` function within the CLI.
+
+    This class contains tests that verify whether `list_plists` handles the
+    display of plist files correctly, based on different conditions provided
+    through command-line arguments.
+
+    Methods
+    -------
+    test_list_plists_without_id()
+        Test the behaviour of `list_plists` when no specific plist ID is provided.
+    test_list_plists_with_id()
+        Test the behaviour of `list_plists` when a specific plist ID is provided.
+    """
+
+    def test_list_plists_without_id(self):
+        """Test `list_plists` for its ability to list all tracked plist files.
+
+        This method asserts that if no plist ID is provided in the arguments,
+        `list_plists` retrieves all tracked plist files and then correctly passes the
+        response to the display function.
+
+        Mocks are used to simulate the retrieval and display processes, validating that
+        the function's flow and data handling are as designed.
+        """
+        args = argparse.Namespace(plist_id=None)
+        with patch("launchd_me.cli.PlistDbGetters") as MockDbGetter, patch(
+            "launchd_me.cli.DbDisplayer"
+        ) as MockDbDisplayer:
+            mock_db_getter = MockDbGetter.return_value
+            mock_db_displayer = MockDbDisplayer.return_value
+            mock_db_getter.get_all_tracked_plist_files.return_value = [
+                {"id": "123", "name": "TestPlist"}
+            ]
+            list_plists(args)
+            mock_db_getter.get_all_tracked_plist_files.assert_called_once()
+            mock_db_displayer.display_all_tracked_plist_files_table.assert_called_once_with(
+                [{"id": "123", "name": "TestPlist"}]
+            )
+
+    def test_list_plists_with_id(self):
+        """Test `list_plists` for its behaviour when a specific plist ID is provided.
+
+        This method asserts that providing a plist ID causes `list_plists` to retrieve
+        details for the given plist ID and pass the response to the display function.
+
+        Mocks are used to simulate the retrieval and display processes, validating that
+        the function's flow and data handling are as designed.
+        """
+        args = argparse.Namespace(plist_id="123")
+        with patch("launchd_me.cli.PlistDbGetters") as MockDbGetter, patch(
+            "launchd_me.cli.DbDisplayer"
+        ) as MockDbDisplayer:
+            mock_db_getter = MockDbGetter.return_value
+            mock_db_displayer = MockDbDisplayer.return_value
+            mock_db_getter.get_a_single_plist_file_details.return_value = {
+                "id": "123",
+                "name": "TestPlist",
+            }
+            list_plists(args)
+            mock_db_getter.get_a_single_plist_file_details.assert_called_once_with(
+                "123"
+            )
+            mock_db_displayer.display_single_plist_file_detail_table.assert_called_once_with(
+                {"id": "123", "name": "TestPlist"}
+            )
