@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
 
-import launchd_me.cli
 import pytest
 from launchd_me.cli import (
     CLIArgumentParser,
@@ -15,6 +14,7 @@ from launchd_me.cli import (
     uninstall_plist,
     valid_path,
 )
+from launchd_me.plist import PlistFileIDNotFound
 
 
 def test_valid_path_for_a_valid_string(tmp_path: Path):
@@ -63,7 +63,8 @@ class TestCLIArgumentParser:
     argument parser and its subcommands are correctly configured and function as
     expected.
 
-    The suite assumes values are validated by argparse. Invalid values are not tested.
+    The suite assumes that values are validated by argparse; invalid values are not
+    tested.
     """
 
     @pytest.fixture(autouse=True)
@@ -112,7 +113,9 @@ class TestCLIArgumentParser:
     def test_create_command_args(
         self, monkeypatch: pytest.MonkeyPatch, attribute: str, expected_value: Any
     ):
-        """Test the 'create' command arguments. ``script_path`` is tested separately.
+        """Test the `'create'` CLI command arguments.
+
+        `script_path` is tested separately.
 
         Parameters
         ----------
@@ -136,7 +139,7 @@ class TestCLIArgumentParser:
         assert getattr(args, attribute) == expected_value
 
     def test_create_command_script_path_arg(self, monkeypatch: pytest.MonkeyPatch):
-        """Test the 'create' script path command argument.
+        """Test the `'create'` script path CLI command argument.
 
         Separated from `test_create_command_args` to test against the `.name`
         pathlib Path attribute. The full file path changes as it's a `tmp_path`.
@@ -165,9 +168,9 @@ class TestCLIArgumentParser:
     def test_list_command_args(
         self, monkeypatch: pytest.MonkeyPatch, test_args: list, plist_id_value: Any
     ):
-        """Test the `'list'` command arguments.
+        """Test the `'list'` CLI command arguments.
 
-        `lists_plists` expects either no passed argument (to display all tracked
+        `list_plists` expects either no passed argument (to display all tracked
         plist files) or a `plist_id` to display details of a specific plist file. This
         test checks if the command line arguments for the `'uninstall'` command
         are parsed as expected using a monkeypatch to simulate command line input.
@@ -187,7 +190,7 @@ class TestCLIArgumentParser:
         assert args.plist_id == plist_id_value
 
     def test_install_command_args(self, monkeypatch: pytest.MonkeyPatch):
-        """Test the 'install' command arguments.
+        """Test the `'install'` CLI command arguments.
 
         This test checks if the command line arguments for the `'install'` command
         are parsed as expected using a monkeypatch to simulate command line input.
@@ -204,7 +207,7 @@ class TestCLIArgumentParser:
         assert args.plist_id == "123"
 
     def test_uninstall_command_args(self, monkeypatch: pytest.MonkeyPatch):
-        """Test the `'uninstall'` command arguments.
+        """Test the `'uninstall'` CLI command arguments.
 
         This test checks if the command line arguments for the `'uninstall'` command
         are parsed as expected using a monkeypatch to simulate command line input.
@@ -221,7 +224,7 @@ class TestCLIArgumentParser:
         assert args.plist_id == "123"
 
     def test_reset_command_args(self, monkeypatch: pytest.MonkeyPatch):
-        """Test the 'reset' command arguments.
+        """Test the `'reset'` CLI command arguments.
 
         This test checks if the command line arguments for the `'reset'` command
         are parsed as expected using a monkeypatch to simulate command line input.
@@ -420,5 +423,97 @@ def test_reset_user():
     pass
 
 
-def test_main():
-    pass
+@patch("launchd_me.cli.CLIArgumentParser")
+@patch("launchd_me.cli.LaunchdMeInit")
+def test_entry_point_main_passes_for_valid_args(
+    MockLaunchdMeInit: Mock, MockCLIArgumentParser: Mock
+):
+    """Test the `main` entry point for launchd_me.
+
+    Tests `main` initializes the required components and executes the function
+    specified in the command-line arguments (via the subparsers `func` properties).
+
+    `mock_parser` represents the Argparse.ArgumentParser created by
+    `CLIArgumentParser.create_parser()`. Mock function represents a CLI command
+    function (e.g. `create_plist`).
+    """
+    mock_launchd_me_init = MockLaunchdMeInit.return_value
+    mock_cli_argument_parser = MockCLIArgumentParser.return_value
+    mock_parser = Mock()
+    mock_function = Mock()
+
+    mock_parser.parse_args.return_value = argparse.Namespace(func=mock_function)
+    mock_launchd_me_init.initialise_launchd_me.return_value = None
+    mock_cli_argument_parser.create_parser.return_value = mock_parser
+
+    main()
+
+    mock_launchd_me_init.initialise_launchd_me.assert_called_once_with()
+    mock_cli_argument_parser.create_parser.assert_called_once_with()
+    mock_function.assert_called_once()
+
+
+@patch("launchd_me.cli.CLIArgumentParser")
+@patch("launchd_me.cli.LaunchdMeInit")
+def test_main_entry_point_handles_exceptions(
+    MockLaunchdMeInit: Mock, MockCLIArgumentParser: Mock
+):
+    """Test the `main` entry point for launchd_me handles propagated Exceptions.
+
+    Mocks the required components and executes the function specified in the
+    command-line arguments (via the subparsers `func` properties).
+
+    The function `mock_function` replicates producing a `PlistFileIDNotFound` error.
+    The test checks `main` handles this exception by printing the appropriate error
+    message.
+
+    - `mock_parser` represents the Argparse.ArgumentParser created by
+      `CLIArgumentParser.create_parser()`.
+    - `mock_function` represents a CLI command function that returns a
+      `PlistFileIDNotFound` error (e.g. `list_plist`).
+    - `mock_print` captures what `main` attempts to print.
+
+    The test first asserts `mock_print` was called once. The test captures the `args`
+    passed to `mocked_print` and casts the result to a string as `actual`. The test
+    casts `synthetic_exception` to a string as `expected`.
+
+    `print` automatically casts an exceptions to strings so equality between strings
+    correctly represents the function's true output.
+
+    Note
+    ----
+    Exceptions aren't equal i.e. `PlistFileIDNotFound("message")` !=
+    `PlistFileIDNotFound("message")` - which would have been a simpler, but less
+    accurate, test.
+    """
+    # Create mocks for the test.
+    mock_launchd_me_init = MockLaunchdMeInit.return_value
+    mock_cli_argument_parser = MockCLIArgumentParser.return_value
+    mock_parser = Mock()
+
+    # Configure the mock function to simulate raising an error when called.
+    synthetic_exception = PlistFileIDNotFound("There is no plist file with the ID: 2")
+    mock_function = Mock(side_effect=synthetic_exception)
+
+    # Configure returns values for the mocked parser's parse_args method and other
+    # initialization steps.
+    mock_parser.parse_args.return_value = argparse.Namespace(func=mock_function)
+    mock_launchd_me_init.initialise_launchd_me.return_value = None
+    mock_cli_argument_parser.create_parser.return_value = mock_parser
+
+    # Patch the built-in print function to monitor its usage and capture the arguments
+    # it receives.
+    with patch("builtins.print") as mock_print:
+        main()
+
+    # First assertion.
+    mock_print.assert_called_once()
+
+    # For comparison, convert the synthetic exception to a string.
+    expected = str(synthetic_exception)
+
+    # Retrieve the actual argument passed to the mocked print function.
+    args, kwargs = mock_print.call_args
+    # For comparison, convert the actual printed argument to a string.
+    actual = str(args[0])
+    assert actual == expected
