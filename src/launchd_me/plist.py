@@ -3,6 +3,7 @@ import logging
 import re
 import sqlite3
 import subprocess
+import types
 from datetime import datetime
 from enum import Enum
 from importlib import resources
@@ -59,7 +60,7 @@ class UserConfig:
         symlinked in this dir are automatically loaded on restart.
     """
 
-    def __init__(self, user_dir: Path = None):
+    def __init__(self, user_dir: Path = None) -> None:
         self.user_name: str = getpass.getuser()
         self.user_dir = Path(user_dir) if user_dir else Path.home()
         self.project_dir = Path(self.user_dir / "launchd-me")
@@ -84,7 +85,7 @@ class PListDbConnectionManager:
         launchd-me init must run first.
     """
 
-    def __init__(self, user_config: UserConfig):
+    def __init__(self, user_config: UserConfig) -> None:
         self.db_file = user_config.ldm_db_file
         if not user_config.project_dir.exists():
             try:
@@ -100,13 +101,15 @@ class PListDbConnectionManager:
         self.connection = None
         self.cursor = None
 
-    def __enter__(self):
+    def __enter__(self) -> sqlite3.Cursor:
         """Establish the connection and return the cursor."""
         self.connection = sqlite3.connect(self.db_file)
         self.cursor = self.connection.cursor()
         return self.cursor
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: type, exc_val: Exception, exc_tb: types.TracebackType
+    ) -> None:
         """Commit if no exception, otherwise rollback. Close the connection."""
         if exc_type is None:
             self.connection.commit()
@@ -129,10 +132,10 @@ class PListDbConnectionManager:
 class LaunchdMeInit:
     """Initialise all required directories and files for launchd-me."""
 
-    def __init__(self, user_config: UserConfig):
+    def __init__(self, user_config: UserConfig) -> None:
         self._user_config = user_config
 
-    def initialise_launchd_me(self):
+    def initialise_launchd_me(self) -> None:
         """Runs all initialisation methods."""
         logger.debug("Initialising launchd-me")
         logger.debug("Ensure application directory exists.")
@@ -140,20 +143,20 @@ class LaunchdMeInit:
         logger.debug("Ensure launchd-me database exists.")
         self._ensure_db_exists()
 
-    def _create_app_directories(self):
+    def _create_app_directories(self) -> None:
         """Create the required app directories if they don't already exist."""
         self._user_config.project_dir.mkdir(parents=True, exist_ok=True)
         self._user_config.plist_dir.mkdir(parents=True, exist_ok=True)
         logger.debug("App directories exist.")
 
-    def _ensure_db_exists(self):
+    def _ensure_db_exists(self) -> None:
         """Create of the ldm database file if it doesn't already exist."""
         if not self._user_config.ldm_db_file.exists():
             PListDbConnectionManager(self._user_config)
 
 
 class LaunchdMeUninstaller:
-    def __init__(self, user_config: UserConfig):
+    def __init__(self, user_config: UserConfig) -> None:
         self._user_config = user_config
 
     def uninstall_launchd_me(self):
