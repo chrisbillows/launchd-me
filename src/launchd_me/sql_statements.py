@@ -38,3 +38,6 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 PLISTFILES_TABLE_SELECT_ALL = "SELECT * FROM PlistFiles"
+PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE = (
+    "SELECT * FROM  PlistFiles WHERE plistFileId = ?"
+)

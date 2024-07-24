@@ -3,6 +3,7 @@ import logging
 import re
 import sqlite3
 import subprocess
+import types
 from datetime import datetime
 from enum import Enum
 from importlib import resources
@@ -18,6 +19,7 @@ from launchd_me.sql_statements import (
     CREATE_TABLE_INSTALLATION_EVENTS,
     CREATE_TABLE_PLIST_FILES,
     PLISTFILES_TABLE_INSERT_INTO,
+    PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE,
 )
 
 
@@ -58,7 +60,7 @@ class UserConfig:
         symlinked in this dir are automatically loaded on restart.
     """
 
-    def __init__(self, user_dir: Path = None):
+    def __init__(self, user_dir: Path = None) -> None:
         self.user_name: str = getpass.getuser()
         self.user_dir = Path(user_dir) if user_dir else Path.home()
         self.project_dir = Path(self.user_dir / "launchd-me")
@@ -83,7 +85,7 @@ class PListDbConnectionManager:
         launchd-me init must run first.
     """
 
-    def __init__(self, user_config: UserConfig):
+    def __init__(self, user_config: UserConfig) -> None:
         self.db_file = user_config.ldm_db_file
         if not user_config.project_dir.exists():
             try:
@@ -99,13 +101,15 @@ class PListDbConnectionManager:
         self.connection = None
         self.cursor = None
 
-    def __enter__(self):
+    def __enter__(self) -> sqlite3.Cursor:
         """Establish the connection and return the cursor."""
         self.connection = sqlite3.connect(self.db_file)
         self.cursor = self.connection.cursor()
         return self.cursor
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: type, exc_val: Exception, exc_tb: types.TracebackType
+    ) -> None:
         """Commit if no exception, otherwise rollback. Close the connection."""
         if exc_type is None:
             self.connection.commit()
@@ -128,10 +132,10 @@ class PListDbConnectionManager:
 class LaunchdMeInit:
     """Initialise all required directories and files for launchd-me."""
 
-    def __init__(self, user_config: UserConfig):
+    def __init__(self, user_config: UserConfig) -> None:
         self._user_config = user_config
 
-    def initialise_launchd_me(self):
+    def initialise_launchd_me(self) -> None:
         """Runs all initialisation methods."""
         logger.debug("Initialising launchd-me")
         logger.debug("Ensure application directory exists.")
@@ -139,20 +143,20 @@ class LaunchdMeInit:
         logger.debug("Ensure launchd-me database exists.")
         self._ensure_db_exists()
 
-    def _create_app_directories(self):
+    def _create_app_directories(self) -> None:
         """Create the required app directories if they don't already exist."""
         self._user_config.project_dir.mkdir(parents=True, exist_ok=True)
         self._user_config.plist_dir.mkdir(parents=True, exist_ok=True)
         logger.debug("App directories exist.")
 
-    def _ensure_db_exists(self):
+    def _ensure_db_exists(self) -> None:
         """Create of the ldm database file if it doesn't already exist."""
         if not self._user_config.ldm_db_file.exists():
             PListDbConnectionManager(self._user_config)
 
 
 class LaunchdMeUninstaller:
-    def __init__(self, user_config: UserConfig):
+    def __init__(self, user_config: UserConfig) -> None:
         self._user_config = user_config
 
     def uninstall_launchd_me(self):
@@ -553,7 +557,7 @@ class PlistDbGetters:
     """Getters for database values. For displaying the values use a `DbDisplayer()`."""
 
     def __init__(self, user_config: UserConfig) -> None:
-        """Initializer. ``user_config`` supplies the path to the database.
+        """Initialize the PlistDbGetters with user configuration.
 
         Parameters
         ----------
@@ -562,18 +566,18 @@ class PlistDbGetters:
         """
         self._user_config = user_config
 
-    def verify_a_plist_id_is_valid(self, plist_id) -> None:
+    def verify_a_plist_id_is_valid(self, plist_id: int) -> None:
         """Checks if a plist file ID is valid.
 
         Attributes
         ----------
         plist_id: int
-            A plist_id as an int. Argparse validates the user input as an int.
+            A plist ID to be validated.
 
         Raises
         ------
         PlistFileIDNotFound
-            If the given plist id is not in the database.
+            If the given plist id is not found in the database.
         """
         logger.debug(f'Checking if plist_id "{plist_id}" is in the database')
         with PListDbConnectionManager(self._user_config) as cursor:
@@ -593,8 +597,7 @@ class PlistDbGetters:
         Returns
         -------
         all_rows: list[tuple]
-            A list of all database rows as tuples, where tuple[0] =
-            "PlistFileID" etc.
+            A list of all database rows as tuples, where tuple[0] = "PlistFileID", etc.
         """
         with PListDbConnectionManager(self._user_config) as cursor:
             cursor.execute(
@@ -608,28 +611,26 @@ class PlistDbGetters:
     def get_a_single_plist_file_details(self, plist_id) -> dict:
         """Get all details and column headings of a given plist file.
 
-        The method calls ``verify_a_plist_is_valid`` to verify ``plist_id`` is in the
-        database. The method fetches the plist file details then the uses
-        `cursor.description` attribute to fetch the column headings. These column
-        headings and plist file details are zipped into a dictionary in the format
+        The method calls ``verify_a_plist_is_valid`` to ensure ``plist_id`` is in the
+        database. It fetches the plist file details then the uses the
+        ``cursor.description`` attribute to retrieve the column headings. The column
+        headings and plist file details are combined into a dictionary in the format
         ``{"field_name": "value"}``.
 
         Parameters
         ----------
         plist_id: int
-            A plist_id as an int. Argparse validates the user input as an int.
+            The plist file ID to retrieve details for.
 
         Returns
         -------
         plist_detail: dict
-            A dict of the plist file details in the format ``{'PlistFileID': 1,
-            'PlistFileName': 'mock_plist_1' etc}``.
+            A dictionary containing plist file details in the format
+            ``{'PlistFileID': 1, 'PlistFileName': 'mock_plist_1' ...}``.
         """
         self.verify_a_plist_id_is_valid(plist_id)
         with PListDbConnectionManager(self._user_config) as cursor:
-            cursor.execute(
-                "SELECT * FROM  PlistFiles WHERE plistFileId = ?", (plist_id,)
-            )
+            cursor.execute(PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE, (plist_id,))
             target_row = cursor.fetchall()
             description = [description[0] for description in cursor.description]
         plist_detail = dict(zip(description, target_row[0]))
@@ -640,102 +641,37 @@ class DbDisplayer:
     """Display Plist data to the user."""
 
     def __init__(self, user_config: UserConfig) -> None:
-        """Initializer. ``user_config`` supplies the path to the database.
+        """Initialize the DbDisplayer with user configuration.
 
         Parameters
         ----------
         user_config: UserConfig
-            A UserConfig object.
+            An instance of UserConfig, containing the path to the database.
         """
         self._user_config = user_config
 
-    def display_all_rows_table(self, all_rows: list[tuple]) -> None:
-        """Public method to display PlistFile summary data in a table.
+    def display_all_tracked_plist_files_table(self, all_rows: list[tuple]) -> None:
+        """Display PlistFile summary data in a table.
 
         Parameters
         ----------
         all_rows: list[tuple]
-            A list of all database rows as tuples, where tuple[0] =
-            "PlistFileID" etc.
+            A list of all database rows as tuples, where tuple[0] = "PlistFileID", etc.
         """
-        table = self._create_table(all_rows)
+        table = self._create_all_tracked_plist_files_table(all_rows)
         self._table_displayer(table)
 
-    # TODO: Refactor once we actually have plist file contents in the db.
-    # Add type of `plist_detail`
-    def display_plist_detail(self, plist_detail) -> None:
+    def display_single_plist_file_detail_table(self, plist_detail: dict) -> None:
         """Display a detailed overview of a single plist file.
 
-        Note
-        ----
-        This is currently hardcoded to display the plist file content for every plist.
-
         Parameters
         ----------
-        plist_detail:
-            #TODO: Confirm what type is.
+        plist_detail: dict
+            A dictionary containing data about a tracked plist file in the format:
+            { 'PlistFileID': <id>, 'PlistFileName': <name>, ... }.
         """
-        console = Console()
-        table = Table()
-        table.add_column("Plist File")
-        table.add_column("Details")
-        for field_name, value in plist_detail.items():
-            if isinstance(value, int):
-                value = str(value)
-            if field_name == "ScriptName":
-                table.add_row(field_name, value, style="magenta")
-            else:
-                table.add_row(field_name, value)
-        file = "/Users/chrisbillows/launchd-me/plist_files/local.chrisbillows.whole_new_name_0001.plist"
-        table.add_row("________________", "________________")
-        table.add_row("PlistFileContent", "")
-        with open(file, "r") as file_handle:
-            contents = file_handle.readlines()
-        for line in contents:
-            output = line.replace("\n", "")
-            output = self._style_xml_tags(output)
-            table.add_row("", output)
-        print()  # Just to give an extra line for style.
-        console.print(table)
-
-    def _format_date(self, iso_datetime: str) -> str:
-        """Reformat a valid ISO datetime string as YYYY-MM-DD for display.
-
-        Notes
-        -----
-        Prior to Python 3.11, ``datetime.isoformat`` only supported ISO formats that
-        could be emitted by ``date.isoformat()`` or ``datetime.isoformat()``. The Z UTC
-        suffix format was not supported. To support earlier Python versions
-        ``_format_date`` replaces Z UTC suffixes with a UTC "+00:00" string.
-
-        For more see:
-        https://docs.python.org/3.11/library/datetime.html#datetime.datetime.fromisoformat
-
-        Parameters
-        ----------
-        iso_datetime: str
-            A valid ISO datetime.
-        """
-        if iso_datetime.endswith("Z"):
-            iso_datetime = iso_datetime.replace("Z", "+00:00")
-        iso_datetime = datetime.fromisoformat(iso_datetime)
-        formatted_date = iso_datetime.strftime("%d-%m-%Y")
-        return formatted_date
-
-    def _style_xml_tags(self, text_to_style: str) -> str:
-        """Add Rich styling to any XML opening/closing tags in a string."""
-        re_pattern = r"<([^>]+)>"
-        matches = re.finditer(re_pattern, text_to_style)
-        last_end = 0
-        styled_text = ""
-
-        for match in matches:
-            start, end = match.span()
-            styled_text += text_to_style[last_end:start]
-            styled_text += f"[grey69]{text_to_style[start:end]}[/grey69]"
-            last_end = end
-        styled_text += text_to_style[last_end:]
-        return styled_text
+        table = self._create_single_plist_file_detail_table(plist_detail)
+        self._table_displayer(table)
 
     def _table_displayer(self, table: Table) -> None:
         """Print a table to the console. Isolated for easy testing.
@@ -743,28 +679,69 @@ class DbDisplayer:
         Parameters
         ----------
         table: Table
-            A rich Table object.
+            A ``rich.Table`` object to be printed to the console.
         """
         console = Console()
         console.print("\n", table)
 
-    def _create_table(self, all_rows) -> Table:
-        """Create a formatted `rich` Table to display rows of PlistFile data.
+    def _create_single_plist_file_detail_table(self, plist_detail: dict) -> Table:
+        """Create a formatted ``rich`` Table to display details of a single plist file.
+
+        Every item in ``plist_detail`` is added as a row. Row styling can be added by
+        specifying a style in the ``ROW_STYLING`` dictionary. A value can be formatted
+        for display by adding a ``formatter`` callable to ``VALUE_FORMATTERS``. All
+        values are cast to the table as strings as ``rich`` cannot display ints, for
+        example.
+
+        ``PlistFileContent`` is displayed in a separate section created with additional
+        rows.
 
         Parameters
         ----------
-        all_rows: list[tuple]
-            A list of all database rows as tuples, where tuple[0] =
-            "PlistFileID" etc.
+        plist_detail: dict
+            A dictionary containing data about a tracked plist file in the format:
+            { 'PlistFileID': <id>, 'PlistFileName': <name>, ... }.
 
         Returns
         -------
         table: Table
-            A formatted `rich` table containing the ``all_rows`` data.
+            A formatted ``rich`` table containing the ``plist_detail`` data.
+        """
+        VALUE_FORMATTERS = {
+            "PlistFileId": str,
+            "CreatedDate": self._format_date,
+            "PlistFileContent": self._style_xml_tags,
+        }
+        ROW_STYLING = {"ScriptName": "magenta"}
+        table = Table()
+        table.add_column("Plist File")
+        table.add_column("Details")
+        for field_name, value in plist_detail.items():
+            style = ROW_STYLING.get(field_name, None)
+            if field_name in VALUE_FORMATTERS:
+                value = VALUE_FORMATTERS[field_name](value)
+            if field_name == "PlistFileContent":
+                table.add_row("________________", "________________")
+                table.add_row("", "")
+            table.add_row(field_name, str(value), style=style)
+        return table
+
+    def _create_all_tracked_plist_files_table(self, all_rows) -> Table:
+        """Create a formatted ``rich`` Table to display rows of PlistFile data.
+
+        Parameters
+        ----------
+        all_rows: list[tuple]
+            A list of all database rows as tuples, where tuple[0] = "PlistFileID", etc.
+
+        Returns
+        -------
+        table: Table
+            A formatted ``rich`` table containing the ``all_rows`` data.
         """
         table = Table(box=rich.box.SIMPLE, show_header=True)
         table.title = f"  USER `{self._user_config.user_name}` PERSONAL PLIST FILES"
-        table.caption = "Run `ldm list <ID> for full plist file details."
+        table.caption = "Run `ldm list <ID>` for full plist file details."
         table.title_justify = "left"
         table.title_style = "blue3 bold italic"
         table.add_column("File\nID", justify="center", overflow="wrap")
@@ -778,8 +755,47 @@ class DbDisplayer:
         table.add_column("Schedule\nType", justify="center", overflow="fold")
         table.add_column("Schedule\nValue", justify="center", overflow="fold")
         table.add_column("Status", justify="center", overflow="fold")
+        # TODO: Fix this in v0.1.0 tidy up sweep.
         for row in all_rows:
             row = list(row)
             row[3] = self._format_date(row[3])
             table.add_row(*[str(item) for item in row])
         return table
+
+    def _format_date(self, iso_datetime: str) -> str:
+        """Reformat a valid ISO datetime string as YYYY-MM-DD for display.
+
+        Notes
+        -----
+        Prior to Python 3.11, ``datetime.isoformat`` only supported ISO formats that
+        could be emitted by ``date.isoformat()`` or ``datetime.isoformat()``. The Z UTC
+        suffix format was not supported. To support earlier Python versions
+        ``_format_date`` replaces Z UTC suffixes with a "+00:00" UTC string.
+
+        For more see:
+        https://docs.python.org/3.11/library/datetime.html#datetime.datetime.fromisoformat
+
+        Parameters
+        ----------
+        iso_datetime: str
+            A valid ISO datetime string.
+        """
+        if iso_datetime.endswith("Z"):
+            iso_datetime = iso_datetime.replace("Z", "+00:00")
+        iso_datetime = datetime.fromisoformat(iso_datetime)
+        formatted_date = iso_datetime.strftime("%Y-%m-%d")
+        return formatted_date
+
+    def _style_xml_tags(self, text_to_style: str) -> str:
+        """Add ``rich`` styling to any XML opening/closing tags in a string."""
+        re_pattern = r"<([^>]+)>"
+        matches = re.finditer(re_pattern, text_to_style)
+        last_end = 0
+        styled_text = ""
+        for match in matches:
+            start, end = match.span()
+            styled_text += text_to_style[last_end:start]
+            styled_text += f"[grey69]{text_to_style[start:end]}[/grey69]"
+            last_end = end
+        styled_text += text_to_style[last_end:]
+        return styled_text
