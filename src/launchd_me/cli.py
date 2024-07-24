@@ -13,6 +13,11 @@ from launchd_me.plist import (
     PlistInstallationManager,
     UserConfig,
 )
+from launchd_me.templates.logo import (
+    LOGO_ART_ROCKET,
+    LOGO_ART_ROCKET_THREE,
+    LOGO_ART_ROCKET_TWO,
+)
 
 USER_CONFIG = UserConfig()
 LOGO_ART = """
@@ -24,9 +29,9 @@ LOGO_ART = """
 |       | |   _   | |       | | | |   | |     |_  |   _   | |       |   | ||_|| | |   |___   __
 |_______| |__| |__| |_______| |_|  |__| |_______| |__| |__| |______|    |_|   |_| |_______| |__|
 """
-LOGO_DIVIDER = "=" * 96
-LOGO_TEXT = "Easily schedule your scripts on macOS!".center(96, " ")
-LOGO = f"{LOGO_ART}\n{LOGO_DIVIDER}\n{LOGO_TEXT}\n{LOGO_DIVIDER}\n\n"
+LOGO_DIVIDER = "=" * 106
+LOGO_TEXT = "Easily schedule your scripts on macOS".center(107, " ")
+LOGO = f"{LOGO_ART_ROCKET}\n{LOGO_DIVIDER}\n{LOGO_TEXT}\n{LOGO_DIVIDER}\n\n"
 CLI_TEXT = {
     "PARSER": {"DESCRIPTION": "Easily schedule your scripts on macOS."},
     "SUBPARSER": {
