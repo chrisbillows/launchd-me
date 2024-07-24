@@ -154,23 +154,23 @@ class CLIArgumentParser:
         self.parser.print_help()
 
     def _add_create_command(self) -> None:
-        """Add the 'create' subcommand to the argument parser.
+        """Add the `'create'` subcommand to the argument parser.
 
-        This method configures the 'create' subcommand, which allows users to create a
+        This method configures the `'create'` subcommand, which allows users to create a
         plist file to schedule a given script. It sets the default function to be called
         when this subcommand is used and defines the necessary arguments for the
         subcommand.
 
-        The 'create' subcommand includes the following arguments:
-        - script_path: The path to the script to schedule.
-        - schedule_type: The type of schedule ('interval' or 'calendar').
-        - schedule_details: The details of the schedule (e.g., interval in seconds or a
-          dictionary for calendar).
-        - description: A description of what is being automated.
-        - make_executable: A flag to ensure the specified script is executable (defaults
-          to True).
-        - auto_install: A flag to automatically load the plist file to schedule the
-          script (defaults to True).
+        The `'create'` subcommand includes the following arguments:
+        - `script_path`: The path to the script to schedule.
+        - `schedule_type`: The type of schedule ('interval' or 'calendar').
+        - `schedule_details`: The details of the schedule (e.g., interval in seconds or
+           a dictionary for calendar).
+        - `description`: A description of what is being automated.
+        - `make_executable`: A flag to ensure the specified script is executable (defaults
+           to True).
+        - `auto_install`: A flag to automatically load the plist file to schedule the
+           script (defaults to True).
         """
         parser_create = self.subparsers.add_parser(
             "create",
@@ -214,15 +214,15 @@ class CLIArgumentParser:
         )
 
     def _add_list_command(self) -> None:
-        """Add the 'list' subcommand to the argument parser.
+        """Add the `'list'` subcommand to the argument parser.
 
-        This method configures the 'list' subcommand, which allows users to list all
+        This method configures the `'list'` subcommand, which allows users to list all
         tracked plist files or show details of a specific plist file by its ID. It sets
         the default function to be called when this subcommand is used and defines the
         necessary arguments for the subcommand.
 
-        The 'list' subcommand includes the following argument:
-        - plist_id: An optional ID of the plist file to display details for.
+        The `'list'` subcommand includes the following argument:
+        - `plist_id`: An optional ID of the plist file to display details for.
         """
         parser_list = self.subparsers.add_parser(
             "list",
@@ -238,14 +238,14 @@ class CLIArgumentParser:
         )
 
     def _add_install_command(self) -> None:
-        """Add the 'install' subcommand to the argument parser.
+        """Add the `'install'` subcommand to the argument parser.
 
-        This method configures the 'install' subcommand, which allows users to install
+        This method configures the `'install'` subcommand, which allows users to install
         a given plist file. It sets the default function to be called when this
         subcommand is used and defines the necessary argument for the subcommand.
 
-        The 'install' subcommand includes the following argument:
-        - plist_id: The ID of the plist file to install.
+        The `'install'` subcommand includes the following argument:
+        - `plist_id`: The ID of the plist file to install.
         """
         parser_install = self.subparsers.add_parser(
             "install",
@@ -258,14 +258,14 @@ class CLIArgumentParser:
         )
 
     def _add_uninstall_command(self) -> None:
-        """Add the 'uninstall' subcommand to the argument parser.
+        """Add the `'uninstall'` subcommand to the argument parser.
 
-        This method configures the 'uninstall' subcommand, which allows users to
+        This method configures the `'uninstall'` subcommand, which allows users to
         uninstall a given plist file. It sets the default function to be called when
         this subcommand is used and defines the necessary argument for the subcommand.
 
-        The 'uninstall' subcommand includes the following argument:
-        - plist_id: The ID of the plist file to uninstall.
+        The `'uninstall'` subcommand includes the following argument:
+        - `plist_id`: The ID of the plist file to uninstall.
         """
         parser_uninstall = self.subparsers.add_parser(
             "uninstall",
@@ -277,9 +277,9 @@ class CLIArgumentParser:
         parser_uninstall.add_argument("plist_id", help="The plist to un-install")
 
     def _add_reset_command(self) -> None:
-        """Add the 'reset' subcommand to the argument parser.
+        """Add the `'reset'` subcommand to the argument parser.
 
-        This method configures the 'reset' subcommand, which allows users to delete the
+        This method configures the `'reset'` subcommand, which allows users to delete the
         current database and plist directory. It sets the default function to be called
         when this subcommand is used.
         """
@@ -295,7 +295,7 @@ class CLIArgumentParser:
 def create_plist(args: argparse.Namespace) -> None:
     """Create a plist file to schedule a given script.
 
-    This function is called when the 'create' subcommand is used. It initializes a
+    This function is called when the `'create'` subcommand is used. It initializes a
     PlistCreator instance with the provided arguments and calls its driver method to
     create the plist file.
 
@@ -303,13 +303,14 @@ def create_plist(args: argparse.Namespace) -> None:
     ----------
     args : argparse.Namespace
         The arguments passed to the 'create' subcommand. Expected attributes are:
-        - script_path: Path to the script to schedule.
-        - schedule_type: Type of schedule ('interval' or 'calendar').
-        - schedule_details: Details of the schedule (e.g., interval in seconds or a
-          dictionary for calendar).
-        - description: Description of what is being automated.
-        - make_executable: Flag to ensure the specified script is executable.
-        - auto_install: Flag to automatically load the plist file to schedule the script.
+        - `script_path`: Path to the script to schedule.
+        - `schedule_type`: Type of schedule ('interval' or 'calendar').
+        - `schedule_details`: Details of the schedule (e.g., interval in seconds or a
+           dictionary for calendar).
+        - `description`: Description of what is being automated.
+        - `make_executable`: Flag to ensure the specified script is executable.
+        - `auto_install`: Flag to automatically load the plist file to schedule the
+           script.
     """
     logger.debug("Instantiating PlistCreator.")
     plc = PlistCreator(
@@ -328,7 +329,7 @@ def create_plist(args: argparse.Namespace) -> None:
 def list_plists(args: argparse.Namespace) -> None:
     """List all tracked plist files or shows details of a specific plist file by its ID.
 
-    This function is called when the 'list' subcommand is used. It retrieves and
+    This function is called when the `'list'` subcommand is used. It retrieves and
     displays information about plist files from the database. If a plist ID is provided,
     it shows details for that specific plist file. Otherwise, it lists all tracked plist
     files.
@@ -337,7 +338,7 @@ def list_plists(args: argparse.Namespace) -> None:
     ----------
     args : argparse.Namespace
         The arguments passed to the 'list' subcommand. Expected attributes are:
-        - plist_id: An optional ID of the plist file to display details for.
+        - `plist_id`: An optional ID of the plist file to display details for.
     """
     db_getters = PlistDbGetters(USER_CONFIG)
     if args.plist_id:
@@ -355,15 +356,15 @@ def list_plists(args: argparse.Namespace) -> None:
 def install_plist(args: argparse.Namespace) -> None:
     """Install a given plist file.
 
-    This function is called when the 'install' subcommand is used. It verifies the
+    This function is called when the `'install'` subcommand is used. It verifies the
     provided plist ID, retrieves the plist file details, and installs the plist file
     using the PlistInstallationManager.
 
     Parameters
     ----------
     args : argparse.Namespace
-        The arguments passed to the 'install' subcommand. Expected attributes are:
-        - plist_id: The ID of the plist file to install.
+        The arguments passed to the `'install'` subcommand. Expected attributes are:
+        - `plist_id`: The ID of the plist file to install.
     """
     db_getter = PlistDbGetters(USER_CONFIG)
     db_setter = PlistDbSetters(USER_CONFIG)
@@ -378,15 +379,15 @@ def install_plist(args: argparse.Namespace) -> None:
 def uninstall_plist(args: argparse.Namespace) -> None:
     """Uninstall a given plist file.
 
-    This function is called when the 'uninstall' subcommand is used. It verifies the
+    This function is called when the `'uninstall'` subcommand is used. It verifies the
     provided plist ID, retrieves the plist file details, and uninstalls the plist file
     using the PlistInstallationManager.
 
     Parameters
     ----------
     args : argparse.Namespace
-        The arguments passed to the 'uninstall' subcommand. Expected attributes are:
-        - plist_id: The ID of the plist file to uninstall.
+        The arguments passed to the `'uninstall'` subcommand. Expected attributes are:
+        - `plist_id`: The ID of the plist file to uninstall.
     """
     db_getter = PlistDbGetters(USER_CONFIG)
     db_setter = PlistDbSetters(USER_CONFIG)
@@ -401,13 +402,14 @@ def uninstall_plist(args: argparse.Namespace) -> None:
 def reset_user(args: argparse.Namespace) -> None:
     """Delete the current database and plist directory.
 
-    This function is called when the 'reset' subcommand is used. It fetches the project
-    directory from the user configuration and deletes it along with all its contents.
+    This function is called when the `'reset'` subcommand is used. It fetches the
+    project directory from the user configuration and deletes it along with all its
+    contents.
 
     Parameters
     ----------
     args : argparse.Namespace
-        The arguments passed to the 'reset' subcommand. This function does not expect
+        The arguments passed to the `'reset'` subcommand. This function does not expect
         any specific attributes in the args.
     """
     logger.debug("Fetching the project directory")

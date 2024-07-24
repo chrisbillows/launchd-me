@@ -455,7 +455,7 @@ def test_entry_point_main_passes_for_valid_args(
 
 @patch("launchd_me.cli.CLIArgumentParser")
 @patch("launchd_me.cli.LaunchdMeInit")
-def test_main_entry_point_handles_exceptions(
+def test_entry_point_main_handles_exceptions(
     MockLaunchdMeInit: Mock, MockCLIArgumentParser: Mock
 ):
     """Test the `main` entry point for launchd_me handles propagated Exceptions.
