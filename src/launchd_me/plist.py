@@ -14,10 +14,16 @@ import rich
 from rich.console import Console
 from rich.table import Table
 
+from launchd_me.exceptions import (
+    InvalidScheduleType,
+    PlistFileIDNotFound,
+    UnexpectedInstallationStatus,
+)
 from launchd_me.logger_config import logger
 from launchd_me.sql_statements import (
     CREATE_TABLE_INSTALLATION_EVENTS,
     CREATE_TABLE_PLIST_FILES,
+    PLISTFILES_TABLE_GET_INSTALL_STATUS,
     PLISTFILES_TABLE_INSERT_INTO,
     PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE,
 )
@@ -164,10 +170,6 @@ class LaunchdMeUninstaller:
 
     def delete_user_info(self):
         pass
-
-
-class InvalidScheduleType(Exception):
-    pass
 
 
 class PlistCreator:
@@ -549,10 +551,6 @@ class PlistInstallationManager:
             raise e
 
 
-class PlistFileIDNotFound(Exception):
-    pass
-
-
 class PlistDbGetters:
     """Getters for database values. For displaying the values use a `DbDisplayer()`."""
 
@@ -590,6 +588,35 @@ class PlistDbGetters:
                 logger.error(message)
                 raise PlistFileIDNotFound(message)
             logger.debug(f'Plist_id "{plist_id}" is in the database')
+
+    def verify_a_plist_id_installation_status(
+        self, plist_id: int, expected_status: str
+    ) -> None:
+        """Check a valid plist file ID has the expected installation status.
+
+        Attributes
+        ----------
+        plist_id: int
+            A valid plist ID.
+        expected_status: str
+            The expected current installation status in the database.
+
+        Raises
+        """
+        logger.debug(
+            f'Checking if plist_id "{plist_id}" has an install status of {expected_status}'
+        )
+        with PListDbConnectionManager(self._user_config) as cursor:
+            cursor.execute(PLISTFILES_TABLE_GET_INSTALL_STATUS, (plist_id,))
+            install_status = cursor.fetchall()[0][0]
+            logger.debug(
+                f'Plist_id "{plist_id}" has an install status if {install_status}'
+            )
+        if install_status != expected_status:
+            message = f"Cannot perform operation. Plist ID {plist_id} is already {install_status}"
+            logger.debug(message)
+            raise UnexpectedInstallationStatus(message)
+        logger.debug(f'Plist id "{plist_id}" has the expected install status.')
 
     def get_all_tracked_plist_files(self) -> list[tuple]:
         """Get details of all tracked plist files.
