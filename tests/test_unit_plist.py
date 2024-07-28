@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import rich.box
+from launchd_me.exceptions import UnexpectedInstallationStatus
 from launchd_me.plist import (
     DbDisplayer,
     LaunchdMeInit,
@@ -639,17 +640,36 @@ class TestDbGetters:
             assert self.dbg.verify_a_plist_id_is_valid(4) is None
 
     @pytest.mark.parametrize(
-        "plist_id, expected_value", [(1, True), (2, True), (3, False)]
+        "plist_id, expected_installation_status",
+        [(1, "running"), (2, "running"), (3, "inactive")],
     )
-    def test_verify_a_plist_id_installation_status_returns_correctly(
-        self, plist_id, expected_value
+    def test_verify_a_plist_id_installation_doesnt_raise_for_an_expected_status(
+        self, plist_id, expected_installation_status
     ):
-        """Test the installation status of a plist id."""
+        """Test the method doesn't raise an error for an expected installation status."""
         add_three_plist_file_entries_to_a_plist_files_table(
             self.dbg._user_config.ldm_db_file
         )
-        actual = self.dbg.verify_a_plist_id_installation_status(plist_id)
-        assert actual == expected_value
+        actual = self.dbg.verify_a_plist_id_installation_status(
+            plist_id, expected_installation_status
+        )
+        assert actual is None
+
+    @pytest.mark.parametrize(
+        "plist_id, expected_installation_status",
+        [(1, "inactive"), (2, "inactive"), (3, "running")],
+    )
+    def test_verify_a_plist_id_installation_raises_for_an_unexpected_status(
+        self, plist_id, expected_installation_status
+    ):
+        """Test the method raises for an unexpected installation status."""
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+        with pytest.raises(UnexpectedInstallationStatus):
+            self.dbg.verify_a_plist_id_installation_status(
+                plist_id, expected_installation_status
+            )
 
     def test_get_all_tracked_plist_files_for_three_rows_of_data(self):
         """Test `get_all_tracked_plist_files` works correctly with three synthetic rows

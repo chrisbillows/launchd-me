@@ -2,6 +2,7 @@ import argparse
 import shutil
 from pathlib import Path
 
+from launchd_me.exceptions import UnexpectedInstallationStatus
 from launchd_me.logger_config import logger
 from launchd_me.plist import (
     DbDisplayer,
@@ -362,19 +363,26 @@ def install_plist(args: argparse.Namespace) -> None:
     """Install a given plist file.
 
     This function is called when the `'install'` subcommand is used. It verifies the
-    provided plist ID, retrieves the plist file details, and installs the plist file
-    using the PlistInstallationManager.
+    provided plist ID, verifies the plist ID is currently not installed, then retrieves
+    the plist file details, and installs the plist file using the
+    PlistInstallationManager.
 
     Parameters
     ----------
     args : argparse.Namespace
         The arguments passed to the `'install'` subcommand. Expected attributes are:
         - `plist_id`: The ID of the plist file to install.
+
+    Raises
+    ------
+    UnexpectedInstallationStatus
+        If the installation status of the plist file is already installed.
     """
     db_getter = PlistDbGetters(USER_CONFIG)
     db_setter = PlistDbSetters(USER_CONFIG)
     install_manager = PlistInstallationManager(USER_CONFIG, db_setter)
     db_getter.verify_a_plist_id_is_valid(args.plist_id)
+    db_getter.verify_a_plist_id_installation_status(args.plist_id, "inactive")
     plist_detail = db_getter.get_a_single_plist_file_details(args.plist_id)
     plist_filename = Path(plist_detail["PlistFileName"])
     plist_file_path = Path(USER_CONFIG.plist_dir) / plist_filename
@@ -398,6 +406,7 @@ def uninstall_plist(args: argparse.Namespace) -> None:
     db_setter = PlistDbSetters(USER_CONFIG)
     install_manager = PlistInstallationManager(USER_CONFIG, db_setter)
     db_getter.verify_a_plist_id_is_valid(args.plist_id)
+    db_getter.verify_a_plist_id_installation_status(args.plist_id, "running")
     plist_detail = db_getter.get_a_single_plist_file_details(args.plist_id)
     plist_file_name = Path(plist_detail["PlistFileName"])
     symlink_to_plist = Path(USER_CONFIG.launch_agents_dir) / plist_file_name
@@ -444,4 +453,6 @@ def main() -> None:
     try:
         args.func(args)
     except PlistFileIDNotFound as error:
+        print(error)
+    except UnexpectedInstallationStatus as error:
         print(error)
