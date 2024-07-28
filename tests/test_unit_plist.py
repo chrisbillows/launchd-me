@@ -35,8 +35,8 @@ from launchd_me.plist import (
     UserConfig,
 )
 from launchd_me.sql_statements import (
-    PLISTFILES_TABLE_SELECT_ALL,
-    PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE,
+    PLISTFILES_SELECT_ALL,
+    PLISTFILES_SELECT_SINGLE_PLIST_FILE,
 )
 from rich.table import Column, Row
 
@@ -515,7 +515,7 @@ class TestDBSetters:
         )
         connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
         cursor = connection.cursor()
-        cursor.execute(PLISTFILES_TABLE_SELECT_ALL)
+        cursor.execute(PLISTFILES_SELECT_ALL)
         actual = cursor.fetchall()
         connection.close()
         expected = [
@@ -874,7 +874,7 @@ class TestDbDisplayerSinglePlistFileDetailTable:
         )
         connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
         cursor = connection.cursor()
-        cursor.execute(PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE, ("1",))
+        cursor.execute(PLISTFILES_SELECT_SINGLE_PLIST_FILE, ("1",))
         target_row = cursor.fetchall()
         description = [description[0] for description in cursor.description]
         plist_detail = dict(zip(description, target_row[0]))
@@ -1030,7 +1030,7 @@ class TestDbDisplayerAllTrackedPlistFilesTable:
         )
         connection = sqlite3.connect(mock_environment.user_config.ldm_db_file)
         cursor = connection.cursor()
-        cursor.execute(PLISTFILES_TABLE_SELECT_ALL)
+        cursor.execute(PLISTFILES_SELECT_ALL)
         all_rows = cursor.fetchall()
         self.db_displayer = DbDisplayer(mock_environment.user_config)
         self.actual_all_tracked_table = (

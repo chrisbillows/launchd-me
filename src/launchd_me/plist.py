@@ -22,10 +22,14 @@ from launchd_me.exceptions import (
 from launchd_me.logger_config import logger
 from launchd_me.sql_statements import (
     CREATE_TABLE_INSTALLATION_EVENTS,
-    CREATE_TABLE_PLIST_FILES,
-    PLISTFILES_TABLE_GET_INSTALL_STATUS,
-    PLISTFILES_TABLE_INSERT_INTO,
-    PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE,
+    CREATE_TABLE_PLISTFILES,
+    PLISTFILES_COUNT_ALL_ROWS,
+    PLISTFILES_GET_INSTALL_STATUS,
+    PLISTFILES_INSERT_RECORD_INTO,
+    PLISTFILES_SELECT_ALL_FIELDS_FOR_LIST_COMMAND,
+    PLISTFILES_SELECT_SINGLE_PLIST_FILE,
+    PLISTFILES_SET_CURRENT_STATE_INACTIVE,
+    PLISTFILES_SET_CURRENT_STATE_RUNNING,
 )
 
 
@@ -129,7 +133,7 @@ class PListDbConnectionManager:
         with sqlite3.connect(self.db_file) as connection:
             logger.debug("Creating database.")
             cursor = connection.cursor()
-            cursor.execute(CREATE_TABLE_PLIST_FILES)
+            cursor.execute(CREATE_TABLE_PLISTFILES)
             cursor.execute(CREATE_TABLE_INSTALLATION_EVENTS)
             connection.commit()
             logger.debug("Database created.")
@@ -312,7 +316,7 @@ class PlistCreator:
         """
 
         with PListDbConnectionManager(self.user_config) as cursor:
-            cursor.execute("SELECT COUNT(*) FROM PlistFiles")
+            cursor.execute(PLISTFILES_COUNT_ALL_ROWS)
             row_count = cursor.fetchone()[0]
         plist_id = row_count + 1
         plist_file_name = f"local.{self.user_config.user_name}.{self.path_to_script_to_automate.name.split('.')[0]}_{plist_id:04}.plist"
@@ -457,7 +461,7 @@ class PlistDbSetters:
         logger.debug("Adding new plist file to database.")
         with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
-                PLISTFILES_TABLE_INSERT_INTO,
+                PLISTFILES_INSERT_RECORD_INTO,
                 (
                     plist_filename,
                     script_name,
@@ -474,14 +478,14 @@ class PlistDbSetters:
     def add_running_installation_status(self, file_id):
         with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
-                "UPDATE PlistFiles SET CurrentState = 'running' WHERE PlistFileID = ?",
+                PLISTFILES_SET_CURRENT_STATE_RUNNING,
                 (file_id,),
             )
 
     def add_inactive_installation_status(self, file_id):
         with PListDbConnectionManager(self.user_config) as cursor:
             cursor.execute(
-                "UPDATE PlistFiles SET CurrentState = 'inactive' WHERE PlistFileID = ?",
+                PLISTFILES_SET_CURRENT_STATE_INACTIVE,
                 (file_id,),
             )
         logger.debug(f"Plist {file_id} now has 'inactive' status.")
@@ -579,9 +583,7 @@ class PlistDbGetters:
         """
         logger.debug(f'Checking if plist_id "{plist_id}" is in the database')
         with PListDbConnectionManager(self._user_config) as cursor:
-            cursor.execute(
-                "SELECT * FROM  PlistFiles WHERE plistFileId = ?", (plist_id,)
-            )
+            cursor.execute(PLISTFILES_SELECT_SINGLE_PLIST_FILE, (plist_id,))
             target_row = cursor.fetchall()
             if not target_row:
                 message = f"There is no plist file with the ID: {plist_id}"
@@ -607,7 +609,7 @@ class PlistDbGetters:
             f'Checking if plist_id "{plist_id}" has an install status of {expected_status}'
         )
         with PListDbConnectionManager(self._user_config) as cursor:
-            cursor.execute(PLISTFILES_TABLE_GET_INSTALL_STATUS, (plist_id,))
+            cursor.execute(PLISTFILES_GET_INSTALL_STATUS, (plist_id,))
             install_status = cursor.fetchall()[0][0]
             logger.debug(
                 f'Plist_id "{plist_id}" has an install status if {install_status}'
@@ -627,11 +629,7 @@ class PlistDbGetters:
             A list of all database rows as tuples, where tuple[0] = "PlistFileID", etc.
         """
         with PListDbConnectionManager(self._user_config) as cursor:
-            cursor.execute(
-                "SELECT PlistFileID, PlistFileName, ScriptName, CreatedDate, "
-                "ScheduleType, ScheduleValue, CurrentState FROM PlistFiles"
-                " ORDER BY PlistFileID"
-            )
+            cursor.execute(PLISTFILES_SELECT_ALL_FIELDS_FOR_LIST_COMMAND)
             all_rows = cursor.fetchall()
         return all_rows
 
@@ -657,7 +655,7 @@ class PlistDbGetters:
         """
         self.verify_a_plist_id_is_valid(plist_id)
         with PListDbConnectionManager(self._user_config) as cursor:
-            cursor.execute(PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE, (plist_id,))
+            cursor.execute(PLISTFILES_SELECT_SINGLE_PLIST_FILE, (plist_id,))
             target_row = cursor.fetchall()
             description = [description[0] for description in cursor.description]
         plist_detail = dict(zip(description, target_row[0]))
