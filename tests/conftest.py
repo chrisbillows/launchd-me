@@ -7,7 +7,7 @@ from launchd_me.plist import (
     LaunchdMeInit,
     UserConfig,
 )
-from launchd_me.sql_statements import PLISTFILES_TABLE_INSERT_INTO
+from launchd_me.sql_statements import PLISTFILES_INSERT_RECORD_INTO
 
 
 @dataclass
@@ -109,7 +109,7 @@ def add_three_plist_file_entries_to_a_plist_files_table(ldm_db_file_path: Path) 
 
     for plist_file in mock_plist_db_data:
         cursor.execute(
-            PLISTFILES_TABLE_INSERT_INTO,
+            PLISTFILES_INSERT_RECORD_INTO,
             (
                 plist_file[0],
                 plist_file[1],
