@@ -638,6 +638,19 @@ class TestDbGetters:
         with pytest.raises(PlistFileIDNotFound):
             assert self.dbg.verify_a_plist_id_is_valid(4) is None
 
+    @pytest.mark.parametrize(
+        "plist_id, expected_value", [(1, True), (2, True), (3, False)]
+    )
+    def test_verify_a_plist_id_installation_status_returns_correctly(
+        self, plist_id, expected_value
+    ):
+        """Test the installation status of a plist id."""
+        add_three_plist_file_entries_to_a_plist_files_table(
+            self.dbg._user_config.ldm_db_file
+        )
+        actual = self.dbg.verify_a_plist_id_installation_status(plist_id)
+        assert actual == expected_value
+
     def test_get_all_tracked_plist_files_for_three_rows_of_data(self):
         """Test `get_all_tracked_plist_files` works correctly with three synthetic rows
         of data.

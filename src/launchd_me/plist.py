@@ -18,6 +18,7 @@ from launchd_me.logger_config import logger
 from launchd_me.sql_statements import (
     CREATE_TABLE_INSTALLATION_EVENTS,
     CREATE_TABLE_PLIST_FILES,
+    PLISTFILES_TABLE_GET_INSTALL_STATUS,
     PLISTFILES_TABLE_INSERT_INTO,
     PLISTFILES_TABLE_SELECT_SINGLE_PLIST_FILE,
 )
@@ -590,6 +591,29 @@ class PlistDbGetters:
                 logger.error(message)
                 raise PlistFileIDNotFound(message)
             logger.debug(f'Plist_id "{plist_id}" is in the database')
+
+    def verify_a_plist_id_installation_status(self, plist_id: int) -> bool:
+        """Check if a valid plist file ID is tracked as installed in the db.
+
+        Attributes
+        ----------
+        plist_id: int
+            A valid plist ID.
+
+        Returns
+        -------
+        bool:
+            Returns True if the plist file is tracked as installed, otherwise returns
+            False.
+        """
+        logger.debug(f'Checking if plist_id "{plist_id}" is tracked as installed')
+        with PListDbConnectionManager(self._user_config) as cursor:
+            cursor.execute(PLISTFILES_TABLE_GET_INSTALL_STATUS, (plist_id,))
+            install_status = cursor.fetchall()[0][0]
+            logger.debug(
+                f'Plist_id "{plist_id}" has an install status of {install_status}'
+            )
+        return install_status == "running"
 
     def get_all_tracked_plist_files(self) -> list[tuple]:
         """Get details of all tracked plist files.
