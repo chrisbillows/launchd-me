@@ -413,6 +413,20 @@ def uninstall_plist(args: argparse.Namespace) -> None:
     install_manager.uninstall_plist(args.plist_id, symlink_to_plist)
 
 
+def delete_plist(args: argparse.Namespace) -> None:
+    """Delete a given plist file."""
+    db_getter = PlistDbGetters(USER_CONFIG)
+    db_setter = PlistDbSetters(USER_CONFIG)
+    install_manager = PlistInstallationManager(USER_CONFIG, db_setter)
+    db_getter.verify_a_plist_id_is_valid(args.plist_id)
+    if db_getter.verify_a_plist_id_installation_status(args.plist_id, "running"):
+        install_manager.uninstall_plist(args.plist_id)
+    plist_file_details = db_getter.get_a_single_plist_file_details(args.plist_id)
+    plist_file_name = plist_file_details["PlistFileName"]
+    plist_path = USER_CONFIG.plist_dir.resolve() / "plist_file_name"
+    plist_path.unlink()
+
+
 def reset_user(args: argparse.Namespace) -> None:
     """Delete the current database and plist directory.
 
